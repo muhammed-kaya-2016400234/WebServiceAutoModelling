@@ -16,6 +16,8 @@ namespace UyumsoftAndroidTool
 {
     public partial class Form1 : Form
     {
+
+        public static string packageName= "com.example.myproject.models";
         public Form1()
         {
             InitializeComponent();
@@ -23,12 +25,12 @@ namespace UyumsoftAndroidTool
 
         private void button1_Click(object sender, EventArgs e)
         {
-            ServiceTest();
-             WriteToFile();
+            //ServiceTest();
+            WriteToFile();
         }
         static void ServiceTest()
         {
-           
+
             UriBuilder uriBuilder = new UriBuilder(@"http://localhost:51725/WebService1.asmx");
             uriBuilder.Query = "WSDL";
 
@@ -64,7 +66,7 @@ namespace UyumsoftAndroidTool
 
                             foreach (MessagePart part in messagePart.Parts)
                             {
-                                    Console.Out.WriteLine(part.Name);
+                                Console.Out.WriteLine(part.Name);
                             }
                         }
                     }
@@ -113,7 +115,7 @@ namespace UyumsoftAndroidTool
             Console.Out.WriteLine();
             Console.In.ReadLine();
         }
-       
+
         public static void WriteToFile()
         {
             UriBuilder uriBuilder = new UriBuilder(@"http://localhost:51725/WebService1.asmx");
@@ -133,98 +135,189 @@ namespace UyumsoftAndroidTool
                     serviceDescription = ServiceDescription.Read(stream);
                 }
             }
+
             Types types = serviceDescription.Types;
             XmlSchema xmlSchema = types.Schemas[0];
 
-            foreach (object item in xmlSchema.SchemaTypes)
+            Dictionary<string, List<string>> enumDict = new Dictionary<string, List<string>>();
+            Dictionary<string, Dictionary<string, List<string>>> fileEnum = new Dictionary<string, Dictionary<string, List<string>>>();
+            foreach (object item in xmlSchema.Items)
             {
                 XmlSchemaComplexType complexType = item as XmlSchemaComplexType;
-                if (complexType!=null)
+                XmlSchemaSimpleType simpleType = item as XmlSchemaSimpleType;
+                string fileName = "";
+                if (complexType != null)
                 {
-                    using (StreamWriter writer = new StreamWriter("C:\\Users\\muhammet.kaya\\Desktop\\deneme model.txt"))
+                    fileName = "C:\\Users\\muhammet.kaya\\AndroidStudioProjects\\MyProject\\app\\src\\main\\java\\com\\example\\myproject\\models\\" + complexType.Name + ".java";
+                    try
                     {
-                        writer.WriteLine("public class {0} {", complexType.Name);
+                      
+                        using (StreamWriter writer = new StreamWriter(fileName))
+                        {
+                            writer.WriteLine("package " + Form1.packageName + ";");
+                            writer.WriteLine(@"public class {0} {{", complexType.Name);
 
+                            Console.Out.WriteLine("Complex Type: {0}", complexType.Name);
+                            List<XmlSchemaElement> list = OutputElements(complexType.Particle);
 
+                            foreach (XmlSchemaElement childElement in list)
+                            {
+                                string type = childElement.SchemaTypeName.Name;
+                                if (Equals(type, "string")) type = "String";
+                                writer.WriteLine("public {0} {1} ;", type, childElement.Name);
+                            }
 
-                        writer.WriteLine("}");
+                            writer.WriteLine("}");
+                        }
+
+                    }
+                    catch (Exception Ex)
+                    {
+                        Console.WriteLine(Ex.ToString());
                     }
 
+
                 }
-                //Console.WriteLine(item.Name);
-
-               
-
+                else if (simpleType != null)
+                {
+                    XmlSchemaSimpleTypeContent content = simpleType.Content;
+                    if (content is XmlSchemaSimpleTypeRestriction)
+                    {
+                        XmlSchemaSimpleTypeRestriction res = content as XmlSchemaSimpleTypeRestriction;
+                        if (res.BaseTypeName != null && Equals(res.BaseTypeName.Name, "string"))
+                        {
+                            if (!enumDict.ContainsKey(simpleType.Name))
+                            {
+                                enumDict.Add(simpleType.Name, new List<string>());
+                            }
+                            foreach (XmlSchemaFacet en in res.Facets)
+                            {
+                                if (en is XmlSchemaEnumerationFacet)
+                                {
+                                    enumDict[simpleType.Name].Add(en.Value);
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
+                            
+                        }
+                    }
+                }
+                Console.Out.WriteLine();
             }
+            printEnum(enumDict);
+            Console.Out.WriteLine();
+            Console.In.ReadLine();
         }
 
+        private static void printEnum(Dictionary<string, List<string>> a) {
 
 
-        //-------------------------------------------------------------------------------------------------------------
-        private static void OutputElements(XmlSchemaParticle particle)
+            foreach (KeyValuePair<string, List<string>> entry in a)
+            {
+                string fileName = "C:\\Users\\muhammet.kaya\\AndroidStudioProjects\\MyProject\\app\\src\\main\\java\\com\\example\\myproject\\models\\" + entry.Key + ".java";
+                try
+                {
+
+                    using (StreamWriter writer = new StreamWriter(fileName))
+                    {
+                        writer.WriteLine("package " + Form1.packageName + ";");
+                        writer.WriteLine("public enum "+entry.Key + " {");
+                        foreach (string s in entry.Value)
+                        {
+                            writer.WriteLine(s+",");
+
+                           
+                        }
+                        writer.WriteLine("}");
+
+                    }
+                }catch(Exception ex)
+                {
+                    Console.WriteLine(ex.ToString());
+                }
+              }
+        }
+
+            
+
+
+
+    //-------------------------------------------------------------------------------------------------------------
+    private static List<XmlSchemaElement> OutputElements(XmlSchemaParticle particle)
         {
-            XmlSchemaSequence sequence = particle as XmlSchemaSequence;
-            XmlSchemaChoice choice = particle as XmlSchemaChoice;
-            XmlSchemaAll all = particle as XmlSchemaAll;
+            List<XmlSchemaElement> list = new List<XmlSchemaElement>();
+                   
+                XmlSchemaSequence sequence = particle as XmlSchemaSequence;
+                XmlSchemaChoice choice = particle as XmlSchemaChoice;
+                XmlSchemaAll all = particle as XmlSchemaAll;
 
-            if (sequence != null)
-            {
-                Console.Out.WriteLine("  Sequence");
-
-                for (int i = 0; i < sequence.Items.Count; i++)
+                if (sequence != null)
                 {
-                    XmlSchemaElement childElement = sequence.Items[i] as XmlSchemaElement;
-                    XmlSchemaSequence innerSequence = sequence.Items[i] as XmlSchemaSequence;
-                    XmlSchemaChoice innerChoice = sequence.Items[i] as XmlSchemaChoice;
-                    XmlSchemaAll innerAll = sequence.Items[i] as XmlSchemaAll;
+                    Console.Out.WriteLine("  Sequence");
 
-                    if (childElement != null)
+                    for (int i = 0; i < sequence.Items.Count; i++)
                     {
-                        Console.Out.WriteLine("    Element/Type: {0}:{1}", childElement.Name,
-                                              childElement.SchemaTypeName.Name);
+                        XmlSchemaElement childElement = sequence.Items[i] as XmlSchemaElement;
+                        XmlSchemaSequence innerSequence = sequence.Items[i] as XmlSchemaSequence;
+                        XmlSchemaChoice innerChoice = sequence.Items[i] as XmlSchemaChoice;
+                        XmlSchemaAll innerAll = sequence.Items[i] as XmlSchemaAll;
+
+                        if (childElement != null)
+                        {
+                            Console.Out.WriteLine("    Element/Type: {0}:{1}", childElement.Name,
+                                                  childElement.SchemaTypeName.Name);
+                           list.Add(childElement);
+                           // writer.WriteLine("public {0} {1} ;", childElement.SchemaTypeName.Name, childElement.Name);
+                        }
+                        else OutputElements(sequence.Items[i] as XmlSchemaParticle);
                     }
-                    else OutputElements(sequence.Items[i] as XmlSchemaParticle);
                 }
-            }
-            else if (choice != null)
-            {
-                Console.Out.WriteLine("  Choice");
-                for (int i = 0; i < choice.Items.Count; i++)
+                else if (choice != null)
                 {
-                    XmlSchemaElement childElement = choice.Items[i] as XmlSchemaElement;
-                    XmlSchemaSequence innerSequence = choice.Items[i] as XmlSchemaSequence;
-                    XmlSchemaChoice innerChoice = choice.Items[i] as XmlSchemaChoice;
-                    XmlSchemaAll innerAll = choice.Items[i] as XmlSchemaAll;
-
-                    if (childElement != null)
+                    Console.Out.WriteLine("  Choice");
+                    for (int i = 0; i < choice.Items.Count; i++)
                     {
-                        Console.Out.WriteLine("    Element/Type: {0}:{1}", childElement.Name,
-                                              childElement.SchemaTypeName.Name);
-                    }
-                    else OutputElements(choice.Items[i] as XmlSchemaParticle);
-                }
+                        XmlSchemaElement childElement = choice.Items[i] as XmlSchemaElement;
+                        XmlSchemaSequence innerSequence = choice.Items[i] as XmlSchemaSequence;
+                        XmlSchemaChoice innerChoice = choice.Items[i] as XmlSchemaChoice;
+                        XmlSchemaAll innerAll = choice.Items[i] as XmlSchemaAll;
 
-                Console.Out.WriteLine();
-            }
-            else if (all != null)
-            {
-                Console.Out.WriteLine("  All");
-                for (int i = 0; i < all.Items.Count; i++)
+                        if (childElement != null)
+                        {
+                        list.Add(childElement);
+                        Console.Out.WriteLine("    Element/Type: {0}:{1}", childElement.Name,
+                                                  childElement.SchemaTypeName.Name);
+                        }
+                        else OutputElements(choice.Items[i] as XmlSchemaParticle);
+                    }
+
+                    Console.Out.WriteLine();
+                }
+                else if (all != null)
                 {
-                    XmlSchemaElement childElement = all.Items[i] as XmlSchemaElement;
-                    XmlSchemaSequence innerSequence = all.Items[i] as XmlSchemaSequence;
-                    XmlSchemaChoice innerChoice = all.Items[i] as XmlSchemaChoice;
-                    XmlSchemaAll innerAll = all.Items[i] as XmlSchemaAll;
-
-                    if (childElement != null)
+                    Console.Out.WriteLine("  All");
+                    for (int i = 0; i < all.Items.Count; i++)
                     {
+                        XmlSchemaElement childElement = all.Items[i] as XmlSchemaElement;
+                        XmlSchemaSequence innerSequence = all.Items[i] as XmlSchemaSequence;
+                        XmlSchemaChoice innerChoice = all.Items[i] as XmlSchemaChoice;
+                        XmlSchemaAll innerAll = all.Items[i] as XmlSchemaAll;
+
+                        if (childElement != null)
+                        {
+                        list.Add(childElement);
                         Console.Out.WriteLine("    Element/Type: {0}:{1}", childElement.Name,
-                                              childElement.SchemaTypeName.Name);
+                                                  childElement.SchemaTypeName.Name);
+                        }
+                        else OutputElements(all.Items[i] as XmlSchemaParticle);
                     }
-                    else OutputElements(all.Items[i] as XmlSchemaParticle);
+                    Console.Out.WriteLine();
                 }
-                Console.Out.WriteLine();
-            }
+            return list;
+            
         }
     }
 }
