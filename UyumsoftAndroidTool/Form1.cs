@@ -118,7 +118,7 @@ namespace UyumsoftAndroidTool
 
         public static void WriteToFile()
         {
-            UriBuilder uriBuilder = new UriBuilder(@"http://localhost:51725/WebService1.asmx");
+            UriBuilder uriBuilder = new UriBuilder(@"http://localhost/WebService1.asmx");
             uriBuilder.Query = "WSDL";
 
             HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(uriBuilder.Uri);
@@ -151,10 +151,11 @@ namespace UyumsoftAndroidTool
                     fileName = "C:\\Users\\muhammet.kaya\\AndroidStudioProjects\\MyProject\\app\\src\\main\\java\\com\\example\\myproject\\models\\" + complexType.Name + ".java";
                     try
                     {
-                      
-                        using (StreamWriter writer = new StreamWriter(fileName))
+                        WriteImports(fileName);
+                        using (StreamWriter writer = new StreamWriter(fileName,true))
                         {
-                            writer.WriteLine("package " + Form1.packageName + ";");
+                            //writer.WriteLine("package " + Form1.packageName + ";");
+                           
                             writer.WriteLine(@"public class {0} {{", complexType.Name);
 
                             Console.Out.WriteLine("Complex Type: {0}", complexType.Name);
@@ -162,8 +163,11 @@ namespace UyumsoftAndroidTool
 
                             foreach (XmlSchemaElement childElement in list)
                             {
+                               
                                 string type = childElement.SchemaTypeName.Name;
                                 if (Equals(type, "string")) type = "String";
+                                else if (Equals(type, "double")|| Equals(type, "float")|| Equals(type, "decimal")) type = "BigDecimal";
+                                
                                 writer.WriteLine("public {0} {1} ;", type, childElement.Name);
                             }
 
@@ -223,7 +227,7 @@ namespace UyumsoftAndroidTool
 
                     using (StreamWriter writer = new StreamWriter(fileName))
                     {
-                        writer.WriteLine("package " + Form1.packageName + ";");
+                        //writer.WriteLine("package " + Form1.packageName + ";");
                         writer.WriteLine("public enum "+entry.Key + " {");
                         foreach (string s in entry.Value)
                         {
@@ -241,6 +245,30 @@ namespace UyumsoftAndroidTool
               }
         }
 
+        private static void WriteImports(string fileName)
+        {
+            using (StreamWriter writer = new StreamWriter(fileName))
+            {
+                writer.WriteLine("package " + Form1.packageName + ";");
+                writer.WriteLine(
+
+               @"
+import java.util.Date;
+import android.util.Base64;
+import java.util.Hashtable;
+import java.math.BigDecimal;
+import org.ksoap2.serialization.SoapObject;
+import org.ksoap2.serialization.PropertyInfo;
+import org.ksoap2.serialization.SoapPrimitive;
+import org.ksoap2.serialization.SoapSerializationEnvelope;
+
+                "
+                   );
+                   
+
+            }
+
+         }
             
 
 
