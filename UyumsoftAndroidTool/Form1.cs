@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using System.Web.Services.Description;
 using System.Windows.Forms;
 using System.Xml.Schema;
+using System.Xml;
 
 namespace UyumsoftAndroidTool
 {
@@ -20,9 +21,11 @@ namespace UyumsoftAndroidTool
 
         public string packageName = "com.example.myproject.models";
         public string destinationPath = "C:\\Users\\muhammet.kaya\\AndroidStudioProjects\\MyProject\\app\\src\\main\\java\\com\\example\\myproject\\models\\";
-
+        public string Namespace ="www.tempuri.org";
         Dictionary<string, List<string>> enumDict = new Dictionary<string, List<string>>();
         Dictionary<string, List<XmlSchemaElement>> complexTypes = new Dictionary<string, List<XmlSchemaElement>>();
+        Dictionary<string,List<XmlSchemaElement>> inputParamClasses = new Dictionary<string, List<XmlSchemaElement>>();
+        Dictionary<string, List<XmlSchemaElement>> outputParamClasses = new Dictionary<string, List<XmlSchemaElement>>();
         public Form1()
         {
             InitializeComponent();
@@ -124,6 +127,7 @@ namespace UyumsoftAndroidTool
             Console.In.ReadLine();
         }
 
+    
         public void getComplexTypesAndEnums()
         {
             UriBuilder uriBuilder = new UriBuilder(@"http://localhost/WebService1.asmx");
@@ -143,26 +147,63 @@ namespace UyumsoftAndroidTool
                     serviceDescription = ServiceDescription.Read(stream);
                 }
             }
-
+            
             Types types = serviceDescription.Types;
             XmlSchema xmlSchema = types.Schemas[0];
+            string schemaTargetNamespace = xmlSchema.TargetNamespace;
 
+            
+           
 
+            //get input and output param classes
+            foreach(object item in serviceDescription.Messages)
+            {
+                System.Web.Services.Description.Message mes = item as System.Web.Services.Description.Message;
+                string mesname = mes.Name;
+                if (mesname.EndsWith("SoapIn"))
+                {
+                    foreach(MessagePart part in mes.Parts)
+                    {
+                        if (part.Name == "parameters")
+                        {
+                           // XmlQualifiedName param=part.Element;
+                            inputParamClasses[part.Element.Name]=new List<XmlSchemaElement>();
+                        }
+                    }
+
+                }
+                else if (mesname.EndsWith("SoapOut"))
+                {
+                    foreach (MessagePart part in mes.Parts)
+                    {
+                        if (part.Name == "parameters")
+                        {
+                            // XmlQualifiedName param=part.Element;
+                            outputParamClasses[part.Element.Name]=new List<XmlSchemaElement>();
+                        }
+                    }
+                }
+            }
+
+            //get complex types and enums
             Dictionary<string, Dictionary<string, List<string>>> fileEnum = new Dictionary<string, Dictionary<string, List<string>>>();
             foreach (object item in xmlSchema.Items)
             {
                 XmlSchemaComplexType complexType = item as XmlSchemaComplexType;
                 XmlSchemaSimpleType simpleType = item as XmlSchemaSimpleType;
+                XmlSchemaElement element = item as XmlSchemaElement;
+
+
                 string fileName = "";
                 if (complexType != null)
                 {
-                    fileName = "C:\\Users\\muhammet.kaya\\AndroidStudioProjects\\MyProject\\app\\src\\main\\java\\com\\example\\myproject\\models\\" + complexType.Name + ".java";
+                    fileName = destinationPath + complexType.Name + ".java";
                     try
                     {
                         //WriteImports(fileName);
                         using (StreamWriter writer = new StreamWriter(fileName, true))
                         {
-                            
+
                             List<XmlSchemaElement> list = OutputElements(complexType.Particle);
                             complexTypes[complexType.Name] = list;
 
@@ -193,7 +234,7 @@ namespace UyumsoftAndroidTool
                                 if (en is XmlSchemaEnumerationFacet)
                                 {
                                     List<string> list = enumDict[simpleType.Name];  //enum fields
-                                    if(!list.Contains(en.Value)) list.Add(en.Value);
+                                    if (!list.Contains(en.Value)) list.Add(en.Value);
                                 }
                                 else
                                 {
@@ -204,18 +245,46 @@ namespace UyumsoftAndroidTool
                         }
                     }
                 }
-                Console.Out.WriteLine();
+
+                else if (element != null&&inputParamClasses.ContainsKey(element.Name))
+                {
+                    XmlSchemaComplexType ct = element.SchemaType as XmlSchemaComplexType;
+                    if (ct != null)
+                    {
+                       
+                        inputParamClasses[element.Name] = OutputElements(ct.Particle);
+                    }
+                    
+                    
+                }
+                else if (element != null && outputParamClasses.ContainsKey(element.Name))
+                {
+                    XmlSchemaComplexType ct = element.SchemaType as XmlSchemaComplexType;
+                    if (ct != null)
+                    {
+
+                        outputParamClasses[element.Name] = OutputElements(ct.Particle);
+                    }
+
+
+                }
             }
+
             //printEnum();
-            Console.Out.WriteLine();
-            Console.In.ReadLine();
+            // Console.Out.WriteLine();
+            // Console.In.ReadLine();
+        }
+
+        public void printInputParamClasses()
+        {
+
         }
 
         private void printComplexTypeClasses()
         {
             foreach (KeyValuePair<string, List<XmlSchemaElement>> entry in complexTypes)
             {
-                string fileName = "C:\\Users\\muhammet.kaya\\AndroidStudioProjects\\MyProject\\app\\src\\main\\java\\com\\example\\myproject\\models\\" + entry.Key + ".java";
+                string fileName = destinationPath + entry.Key + ".java";
                 try
                 {
                     using (StreamWriter writer = new StreamWriter(fileName))
