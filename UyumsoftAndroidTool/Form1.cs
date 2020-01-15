@@ -6,6 +6,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web.Services.Description;
@@ -17,7 +18,11 @@ namespace UyumsoftAndroidTool
     public partial class Form1 : Form
     {
 
-        public static string packageName= "com.example.myproject.models";
+        public string packageName = "com.example.myproject.models";
+        public string destinationPath = "C:\\Users\\muhammet.kaya\\AndroidStudioProjects\\MyProject\\app\\src\\main\\java\\com\\example\\myproject\\models\\";
+
+        Dictionary<string, List<string>> enumDict = new Dictionary<string, List<string>>();
+        Dictionary<string, List<XmlSchemaElement>> complexTypes = new Dictionary<string, List<XmlSchemaElement>>();
         public Form1()
         {
             InitializeComponent();
@@ -25,8 +30,11 @@ namespace UyumsoftAndroidTool
 
         private void button1_Click(object sender, EventArgs e)
         {
-            //ServiceTest();
-            WriteToFile();
+           
+            getComplexTypesAndEnums();
+            printComplexTypeClasses();
+            printEnum();
+            copyDefaultClasses(destinationPath);
         }
         static void ServiceTest()
         {
@@ -116,7 +124,7 @@ namespace UyumsoftAndroidTool
             Console.In.ReadLine();
         }
 
-        public static void WriteToFile()
+        public void getComplexTypesAndEnums()
         {
             UriBuilder uriBuilder = new UriBuilder(@"http://localhost/WebService1.asmx");
             uriBuilder.Query = "WSDL";
@@ -139,7 +147,7 @@ namespace UyumsoftAndroidTool
             Types types = serviceDescription.Types;
             XmlSchema xmlSchema = types.Schemas[0];
 
-            Dictionary<string, List<string>> enumDict = new Dictionary<string, List<string>>();
+
             Dictionary<string, Dictionary<string, List<string>>> fileEnum = new Dictionary<string, Dictionary<string, List<string>>>();
             foreach (object item in xmlSchema.Items)
             {
@@ -151,27 +159,13 @@ namespace UyumsoftAndroidTool
                     fileName = "C:\\Users\\muhammet.kaya\\AndroidStudioProjects\\MyProject\\app\\src\\main\\java\\com\\example\\myproject\\models\\" + complexType.Name + ".java";
                     try
                     {
-                        WriteImports(fileName);
-                        using (StreamWriter writer = new StreamWriter(fileName,true))
+                        //WriteImports(fileName);
+                        using (StreamWriter writer = new StreamWriter(fileName, true))
                         {
-                            //writer.WriteLine("package " + Form1.packageName + ";");
-                           
-                            writer.WriteLine(@"public class {0} {{", complexType.Name);
-
-                            Console.Out.WriteLine("Complex Type: {0}", complexType.Name);
+                            
                             List<XmlSchemaElement> list = OutputElements(complexType.Particle);
+                            complexTypes[complexType.Name] = list;
 
-                            foreach (XmlSchemaElement childElement in list)
-                            {
-                               
-                                string type = childElement.SchemaTypeName.Name;
-                                if (Equals(type, "string")) type = "String";
-                                else if (Equals(type, "double")|| Equals(type, "float")|| Equals(type, "decimal")) type = "BigDecimal";
-                                
-                                writer.WriteLine("public {0} {1} ;", type, childElement.Name);
-                            }
-
-                            writer.WriteLine("}");
                         }
 
                     }
@@ -192,34 +186,273 @@ namespace UyumsoftAndroidTool
                         {
                             if (!enumDict.ContainsKey(simpleType.Name))
                             {
-                                enumDict.Add(simpleType.Name, new List<string>());
+                                enumDict[simpleType.Name] = new List<string>();
                             }
                             foreach (XmlSchemaFacet en in res.Facets)
                             {
                                 if (en is XmlSchemaEnumerationFacet)
                                 {
-                                    enumDict[simpleType.Name].Add(en.Value);
+                                    List<string> list = enumDict[simpleType.Name];  //enum fields
+                                    if(!list.Contains(en.Value)) list.Add(en.Value);
                                 }
                                 else
                                 {
                                     break;
                                 }
                             }
-                            
+
                         }
                     }
                 }
                 Console.Out.WriteLine();
             }
-            printEnum(enumDict);
+            //printEnum();
             Console.Out.WriteLine();
             Console.In.ReadLine();
         }
 
-        private static void printEnum(Dictionary<string, List<string>> a) {
+        private void printComplexTypeClasses()
+        {
+            foreach (KeyValuePair<string, List<XmlSchemaElement>> entry in complexTypes)
+            {
+                string fileName = "C:\\Users\\muhammet.kaya\\AndroidStudioProjects\\MyProject\\app\\src\\main\\java\\com\\example\\myproject\\models\\" + entry.Key + ".java";
+                try
+                {
+                    using (StreamWriter writer = new StreamWriter(fileName))
+                    {
+                        writer.WriteLine("package " +packageName + ";\n");
+                        WriteImports(writer);
+                        writer.WriteLine("public class {0} {{\n", entry.Key);
+
+                        printFields(entry.Value, writer);
+                        printGetPropertyFunc(entry.Value, writer);
+                        writer.WriteLine("\npublic int getPropertyCount() {{ return {0}; }}\n", entry.Value.Count);
+                        printGetPropertyInfoFunc(entry.Value, writer);
+                        printSetPropertyFunc(entry.Value, writer);
+
+                        writer.WriteLine("\n}");
+                    }
 
 
-            foreach (KeyValuePair<string, List<string>> entry in a)
+
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.ToString());
+                }
+
+            }
+        }
+
+        private void printSetPropertyFunc(List<XmlSchemaElement> fields, StreamWriter writer)
+        {
+            string head = @"
+public void setProperty(int index, Object value)
+{
+    switch (index)
+      {";
+
+            writer.WriteLine(head);
+            for (int i = 0; i < fields.Count; i++)
+            {
+                XmlSchemaElement field = fields[i];
+
+                //string type = getClassOfField(field.SchemaTypeName.Name);
+                string[] values = getValueOfField(field.SchemaTypeName.Name); //values[0] = defaultvalue  //values [1] = value
+                writer.WriteLine(@"          
+            case {0} :
+               if(value.toString().equalsIgnoreCase(""anyType{{}}""))
+                    {1} = {2};
+               else
+                    {1} = {3};
+               
+                break;"
+
+                , i, field.Name, values[0],values[1]);
+
+            }
+            writer.WriteLine();
+            //writer.WriteLine("            default : break;");
+
+            writer.WriteLine("      }\n} ");
+
+        }
+
+        private void printGetPropertyInfoFunc(List<XmlSchemaElement> fields, StreamWriter writer)
+        {
+            string head = @"@SuppressWarnings(""unchecked"")
+public void getPropertyInfo(int index, Hashtable properties, PropertyInfo info)
+{
+    switch (index)
+      {";
+
+
+            writer.WriteLine(head);
+            for (int i = 0; i < fields.Count; i++)
+            {
+                XmlSchemaElement field = fields[i];
+
+                string type = getClassOfField(field.SchemaTypeName.Name);
+
+                writer.WriteLine(@"          
+            case {0} :
+                info.name = ""{1}"";
+                info.type={2};
+                break;"
+
+                , i, field.Name, type);
+
+            }
+            writer.WriteLine();
+            writer.WriteLine("            default : break;");
+
+            writer.WriteLine("      }\n} ");
+
+
+        }
+        private string getClassOfField(string typename)
+        {
+            string type = "";
+            switch (typename)
+            {
+                case "string":
+                    type = "PropertyInfo.STRING_CLASS";
+                    break;
+                case "int":
+                    type = "PropertyInfo.INTEGER_CLASS";
+                    break;
+                case "double":
+                    type = "BigDecimal.class.getClass()";
+                    break;
+                case "decimal":
+                    type = "BigDecimal.class.getClass()";
+                    break;
+                case "float":
+                    type = "BigDecimal.class.getClass()";
+                    break;
+                case "boolean":
+                    type = "PropertyInfo.BOOLEAN_CLASS";
+                    break;
+                case "dateTime":
+                    type = "Date.class.getClass()";
+                    break;
+                default:
+                    if (complexTypes.ContainsKey(typename))
+                    {
+                        type = "new " + typename + "().getClass()";
+                    } else if (enumDict.ContainsKey(typename))
+                    {
+                        type = "PropertyInfo.STRING_CLASS";
+                    }
+                    break;
+
+
+
+
+            }
+            return type;
+        }
+        private string[] getValueOfField(string typename)
+        {
+            string[] values = new string[2];
+            string type = "";
+            string defaultValue = "";
+            switch (typename)
+            {
+                case "string":
+                    type = "value.toString()";
+                    defaultValue="\"\"";
+                    break;
+                case "int":
+                    type = "Integer.parseInt(value.toString())";
+                    defaultValue = "0";
+                    break;
+                case "double":
+                    type = "new BigDecimal(value.toString())";
+                    defaultValue = "new BigDecimal(0)";
+                    break;
+                case "decimal":
+                    type = "new BigDecimal(value.toString())";
+                    defaultValue = "new BigDecimal(0)";
+                    break;
+                case "float":
+                    type = "new BigDecimal(value.toString())";
+                    defaultValue = "new BigDecimal(0)";
+                    break;
+                case "boolean":
+                    type = "Boolean.parseBoolean(value.toString())";
+                    defaultValue = "false";
+                    break;
+                case "dateTime":
+                    type = "DateUtil.getDate(value.toString())";
+                    defaultValue = "new Date(1900, 1, 1)";
+                    break;
+                default:
+                    if (complexTypes.ContainsKey(typename))
+                    {
+                        type = "("+typename+")value";
+                        defaultValue = "null";
+                    }
+                    else if (enumDict.ContainsKey(typename))
+                    {
+                        defaultValue = "\"\"";
+                        type = "value.toString()";
+                    }
+                    break;
+
+
+
+
+            }
+            values[0] = defaultValue;
+            values[1] = type;
+            return values;
+        }
+        private void printFields(List<XmlSchemaElement> list,StreamWriter writer)
+        {
+            foreach (XmlSchemaElement childElement in list)
+            {
+                string type = childElement.SchemaTypeName.Name;
+                bool isEnum = enumDict.ContainsKey(type);
+                if (Equals(type, "string")) type = "String";
+                else if (Equals(type, "double") || Equals(type, "float") || Equals(type, "decimal")) type = "BigDecimal";
+                else if (Equals(type, "dateTime")) type = "Date";
+                else if (isEnum) type = "String";
+
+                if (!isEnum) writer.WriteLine("      public {0} {1} ;", type, childElement.Name);
+                else writer.WriteLine("      public {0} {1} ;  // Enum {2} ", type, childElement.Name, childElement.SchemaTypeName.Name);
+
+            }
+        }
+
+        private void printGetPropertyFunc(List<XmlSchemaElement> fields,StreamWriter writer )
+        {
+                    string head = @" 
+public Object getProperty(int index)
+{
+    switch (index)
+      {";
+           
+                    writer.WriteLine(head);
+                    for(int i = 0; i < fields.Count; i++) {
+                        writer.WriteLine("          case {0} : return {1};",i,fields[i].Name);
+
+                    }
+
+
+                    writer.WriteLine("      } \n    return null;\n} ");
+                
+
+            
+
+
+
+         }
+
+        private void printEnum() {
+
+
+            foreach (KeyValuePair<string, List<string>> entry in enumDict)
             {
                 string fileName = "C:\\Users\\muhammet.kaya\\AndroidStudioProjects\\MyProject\\app\\src\\main\\java\\com\\example\\myproject\\models\\" + entry.Key + ".java";
                 try
@@ -227,15 +460,16 @@ namespace UyumsoftAndroidTool
 
                     using (StreamWriter writer = new StreamWriter(fileName))
                     {
+                        writer.WriteLine("package {0} ;", packageName);
                         //writer.WriteLine("package " + Form1.packageName + ";");
-                        writer.WriteLine("public enum "+entry.Key + " {");
+                        writer.WriteLine("\n public enum "+entry.Key + " {\n");
                         foreach (string s in entry.Value)
                         {
-                            writer.WriteLine(s+",");
+                            writer.WriteLine("  "+s+",");
 
                            
                         }
-                        writer.WriteLine("}");
+                        writer.WriteLine("\n}");
 
                     }
                 }catch(Exception ex)
@@ -245,11 +479,10 @@ namespace UyumsoftAndroidTool
               }
         }
 
-        private static void WriteImports(string fileName)
+        private void WriteImports(StreamWriter writer)
         {
-            using (StreamWriter writer = new StreamWriter(fileName))
-            {
-                writer.WriteLine("package " + Form1.packageName + ";");
+           
+               
                 writer.WriteLine(
 
                @"
@@ -266,11 +499,41 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
                    );
                    
 
-            }
+            
 
          }
             
+        private void copyDefaultClasses(string destinationPath)
+        {
+            string [] filenames=Assembly.GetExecutingAssembly().GetManifestResourceNames();
 
+            foreach (string file in filenames)
+            {
+
+                if (file.StartsWith("UyumsoftAndroidTool.DefaultClasses"))
+                {
+
+                    Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(file);
+                    StreamReader reader = new StreamReader(stream);
+                    string package = "package " + packageName + " ;\n";
+                    string data =package+ reader.ReadToEnd();
+                    string[] list = file.Split(new string[] { "DefaultClasses." },StringSplitOptions.None);
+
+                    string path = destinationPath +"/"+list[1];
+                    using(StreamWriter writer = new StreamWriter(path))
+                    {
+                        writer.WriteLine(data);
+                    }
+                   /*
+                    string dirPath = @"./DefaultClasses";
+                    DirectoryInfo d = new DirectoryInfo(dirPath);
+                    FileInfo[] Files = d.GetFiles("*.java");
+                   */
+
+                }
+            }
+
+        }
 
 
     //-------------------------------------------------------------------------------------------------------------

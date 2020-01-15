@@ -81,5 +81,15 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="DefaultClasses\BaseObject.java" />
+    <EmbeddedResource Include="DefaultClasses\MarshalDate.java" />
+    <EmbeddedResource Include="DefaultClasses\MarshalDecimal.java" />
+    <EmbeddedResource Include="DefaultClasses\MarshalDouble.java" />
+    <EmbeddedResource Include="DefaultClasses\MarshalFloat.java" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="DefaultClasses\DateUtil.java" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
