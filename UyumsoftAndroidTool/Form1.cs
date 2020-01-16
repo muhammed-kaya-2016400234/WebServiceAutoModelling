@@ -35,7 +35,9 @@ namespace UyumsoftAndroidTool
         {
            
             getComplexTypesAndEnums();
-            printComplexTypeClasses();
+            printClasses(complexTypes,"complexType");
+            printClasses(inputParamClasses,"inputParamClass");
+            printClasses(outputParamClasses, "outputParamClass");
             printEnum();
             copyDefaultClasses(destinationPath);
         }
@@ -245,7 +247,7 @@ namespace UyumsoftAndroidTool
                         }
                     }
                 }
-
+                //get input param class fields
                 else if (element != null&&inputParamClasses.ContainsKey(element.Name))
                 {
                     XmlSchemaComplexType ct = element.SchemaType as XmlSchemaComplexType;
@@ -257,6 +259,7 @@ namespace UyumsoftAndroidTool
                     
                     
                 }
+                //get output param class fields
                 else if (element != null && outputParamClasses.ContainsKey(element.Name))
                 {
                     XmlSchemaComplexType ct = element.SchemaType as XmlSchemaComplexType;
@@ -275,14 +278,67 @@ namespace UyumsoftAndroidTool
             // Console.In.ReadLine();
         }
 
+        /*
         public void printInputParamClasses()
         {
+            foreach (KeyValuePair<string, List<XmlSchemaElement>> entry in inputParamClasses)
+            {
+                string fileName = destinationPath + entry.Key + ".java";
+                try
+                {
+                    using (StreamWriter writer = new StreamWriter(fileName))
+                    {
+                        writer.WriteLine("package " + packageName + ";\n");
+                        printImports(writer);
+                        writer.WriteLine("public class {0} {{\n", entry.Key);
+                        writer.WriteLine(" private static final String METHOD_NAME = \""+entry.Key+"\";");
+                        writer.WriteLine(" private static final String NAMESPACE = \"" +Namespace + "\";");
+                        printFields(entry.Value, writer);
+                        printInputParamClassAdditionalFuncs(entry.Value,writer);
+                        printGetPropertyFunc(entry.Value, writer,"");
+                        writer.WriteLine("\npublic int getPropertyCount() {{ return {0}; }}\n", entry.Value.Count);
+                        printGetPropertyInfoFunc(entry.Value, writer,"");
+                        printSetPropertyFunc(entry.Value, writer,"");
 
+                        writer.WriteLine("\n}");
+                    }
+
+                }catch(Exception ex)
+                {
+                    Console.WriteLine(ex.ToString());
+                }
+
+                }
         }
-
-        private void printComplexTypeClasses()
+        */
+        private void printInputParamClassAdditionalFuncs(List<XmlSchemaElement> list,StreamWriter writer)
         {
-            foreach (KeyValuePair<string, List<XmlSchemaElement>> entry in complexTypes)
+            writer.WriteLine(
+    @"public SoapObject GetSoapParams()
+	{
+         SoapObject request = new SoapObject(NAMESPACE, METHOD_NAME);   ");
+
+
+
+            for (int i= 0;i < list.Count;i++) {
+                XmlSchemaElement element = list[i];
+                writer.WriteLine("      PropertyInfo p{0} = new PropertyInfo();",i);
+                writer.WriteLine("      p{0}.setName(\"{1}\");",i,element.Name);
+                writer.WriteLine("      p{0}.setValue({1});", i, element.Name);
+                writer.WriteLine("      p{0}.setType({1});", i, getClassOfField(element.SchemaTypeName.Name));
+                writer.WriteLine("      p{0}.setNamespace(\"{1}\");", i, Namespace);
+                writer.WriteLine("      request.addProperty(p{0});", i);
+
+            }
+
+
+            writer.WriteLine("      return request;");
+            writer.WriteLine("}\n");
+            writer.WriteLine("public String GetSoapAction() { return NAMESPACE + METHOD_NAME;}\n");
+        }
+        private void printClasses(Dictionary<string, List<XmlSchemaElement>> dict,string classType)
+        {
+            foreach (KeyValuePair<string, List<XmlSchemaElement>> entry in dict)
             {
                 string fileName = destinationPath + entry.Key + ".java";
                 try
@@ -290,15 +346,26 @@ namespace UyumsoftAndroidTool
                     using (StreamWriter writer = new StreamWriter(fileName))
                     {
                         writer.WriteLine("package " +packageName + ";\n");
-                        WriteImports(writer);
-                        writer.WriteLine("public class {0} {{\n", entry.Key);
-
+                        printImports(writer);
+                        writer.WriteLine("public class {0} extends BaseObject {{\n", entry.Key);
                         printFields(entry.Value, writer);
-                        printGetPropertyFunc(entry.Value, writer);
-                        writer.WriteLine("\npublic int getPropertyCount() {{ return {0}; }}\n", entry.Value.Count);
-                        printGetPropertyInfoFunc(entry.Value, writer);
-                        printSetPropertyFunc(entry.Value, writer);
 
+                        if (classType == "inputParamClass")
+                        {
+                            writer.WriteLine("      private static final String METHOD_NAME = \"" + entry.Key + "\";");
+                            writer.WriteLine("      private static final String NAMESPACE = \"" + Namespace + "\";\n");
+                            printInputParamClassAdditionalFuncs(entry.Value,writer);
+                        }
+
+                        printGetPropertyFunc(entry.Value, writer,classType);
+                        writer.WriteLine("\npublic int getPropertyCount() {{ return {0}; }}\n", entry.Value.Count);
+                        printGetPropertyInfoFunc(entry.Value, writer,classType);
+                        printSetPropertyFunc(entry.Value, writer,classType);
+
+                        if (classType == "outputParamClass")
+                        {
+                            printLoadSoapObjectFuncForOutput(entry.Value[0],writer);
+                        }
                         writer.WriteLine("\n}");
                     }
 
@@ -313,22 +380,51 @@ namespace UyumsoftAndroidTool
             }
         }
 
-        private void printSetPropertyFunc(List<XmlSchemaElement> fields, StreamWriter writer)
+        
+        private void printLoadSoapObjectFuncForOutput(XmlSchemaElement element,StreamWriter writer)
         {
-            string head = @"
+            writer.WriteLine(@"
+public void loadSoapObject(SoapObject property){{
+		if(property == null) return;
+		{0} = new {1}();
+		{0}.loadSoapObject(property);
+	}}"
+,element.Name,
+element.SchemaTypeName.Name
+
+);
+
+        }
+        private void printSetPropertyFunc(List<XmlSchemaElement> fields, StreamWriter writer,string classType)
+        {
+
+            if (classType == "outputParamClass"&&fields.Count>0)
+            {
+                writer.WriteLine(@"
+public void setProperty(int index, Object value)
+{{
+    {0}=({1}) value;
+}}"
+,fields[0].Name
+,fields[0].SchemaTypeName.Name
+);
+            }
+            else
+            {
+                string head = @"
 public void setProperty(int index, Object value)
 {
     switch (index)
       {";
 
-            writer.WriteLine(head);
-            for (int i = 0; i < fields.Count; i++)
-            {
-                XmlSchemaElement field = fields[i];
+                writer.WriteLine(head);
+                for (int i = 0; i < fields.Count; i++)
+                {
+                    XmlSchemaElement field = fields[i];
 
-                //string type = getClassOfField(field.SchemaTypeName.Name);
-                string[] values = getValueOfField(field.SchemaTypeName.Name); //values[0] = defaultvalue  //values [1] = value
-                writer.WriteLine(@"          
+                    //string type = getClassOfField(field.SchemaTypeName.Name);
+                    string[] values = getValueOfField(field.SchemaTypeName.Name); //values[0] = defaultvalue  //values [1] = value
+                    writer.WriteLine(@"          
             case {0} :
                if(value.toString().equalsIgnoreCase(""anyType{{}}""))
                     {1} = {2};
@@ -337,46 +433,61 @@ public void setProperty(int index, Object value)
                
                 break;"
 
-                , i, field.Name, values[0],values[1]);
+                    , i, field.Name, values[0], values[1]);
 
+                }
+                writer.WriteLine();
+                //writer.WriteLine("            default : break;");
+
+                writer.WriteLine("      }\n} ");
             }
-            writer.WriteLine();
-            //writer.WriteLine("            default : break;");
-
-            writer.WriteLine("      }\n} ");
-
         }
 
-        private void printGetPropertyInfoFunc(List<XmlSchemaElement> fields, StreamWriter writer)
+        private void printGetPropertyInfoFunc(List<XmlSchemaElement> fields, StreamWriter writer,string classType)
         {
-            string head = @"@SuppressWarnings(""unchecked"")
+
+            if (classType == "outputParamClass" && fields.Count > 0)
+            {
+                writer.WriteLine(@"@SuppressWarnings(""unchecked"")
+    public void getPropertyInfo(int index, Hashtable properties, PropertyInfo info)
+    {{
+        info.name = ""{0}"";
+        info.type={1};
+
+}}"
+,fields[0].Name
+,getClassOfField(fields[0].SchemaTypeName.Name));
+            }
+            else
+            {
+                string head = @"@SuppressWarnings(""unchecked"")
 public void getPropertyInfo(int index, Hashtable properties, PropertyInfo info)
 {
     switch (index)
       {";
 
 
-            writer.WriteLine(head);
-            for (int i = 0; i < fields.Count; i++)
-            {
-                XmlSchemaElement field = fields[i];
+                writer.WriteLine(head);
+                for (int i = 0; i < fields.Count; i++)
+                {
+                    XmlSchemaElement field = fields[i];
 
-                string type = getClassOfField(field.SchemaTypeName.Name);
+                    string type = getClassOfField(field.SchemaTypeName.Name);
 
-                writer.WriteLine(@"          
+                    writer.WriteLine(@"          
             case {0} :
                 info.name = ""{1}"";
                 info.type={2};
                 break;"
 
-                , i, field.Name, type);
+                    , i, field.Name, type);
 
+                }
+                writer.WriteLine();
+                writer.WriteLine("            default : break;");
+
+                writer.WriteLine("      }\n} ");
             }
-            writer.WriteLine();
-            writer.WriteLine("            default : break;");
-
-            writer.WriteLine("      }\n} ");
-
 
         }
         private string getClassOfField(string typename)
@@ -494,25 +605,39 @@ public void getPropertyInfo(int index, Hashtable properties, PropertyInfo info)
             }
         }
 
-        private void printGetPropertyFunc(List<XmlSchemaElement> fields,StreamWriter writer )
+        private void printGetPropertyFunc(List<XmlSchemaElement> fields,StreamWriter writer,string classType )
         {
-                    string head = @" 
+            if (classType == "outputParamClass"&&fields.Count>0)
+            {
+                writer.WriteLine(@"
+public Object getProperty(int index)
+    {{
+
+    	return {0};
+
+    }}",fields[0].Name);
+
+            }
+            else
+            {
+                string head = @" 
 public Object getProperty(int index)
 {
     switch (index)
       {";
-           
-                    writer.WriteLine(head);
-                    for(int i = 0; i < fields.Count; i++) {
-                        writer.WriteLine("          case {0} : return {1};",i,fields[i].Name);
 
-                    }
+                writer.WriteLine(head);
+                for (int i = 0; i < fields.Count; i++)
+                {
+                    writer.WriteLine("          case {0} : return {1};", i, fields[i].Name);
+
+                }
 
 
-                    writer.WriteLine("      } \n    return null;\n} ");
-                
+                writer.WriteLine("      } \n    return null;\n} ");
 
-            
+
+            }
 
 
 
@@ -548,7 +673,7 @@ public Object getProperty(int index)
               }
         }
 
-        private void WriteImports(StreamWriter writer)
+        private void printImports(StreamWriter writer)
         {
            
                
