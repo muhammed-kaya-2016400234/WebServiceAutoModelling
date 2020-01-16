@@ -21,11 +21,15 @@ namespace UyumsoftAndroidTool
 
         public string packageName = "com.example.myproject.models";
         public string destinationPath = "C:\\Users\\muhammet.kaya\\AndroidStudioProjects\\MyProject\\app\\src\\main\\java\\com\\example\\myproject\\models\\";
-        public string Namespace ="www.tempuri.org";
+        public string Namespace = "www.tempuri.org";
         Dictionary<string, List<string>> enumDict = new Dictionary<string, List<string>>();
         Dictionary<string, List<XmlSchemaElement>> complexTypes = new Dictionary<string, List<XmlSchemaElement>>();
-        Dictionary<string,List<XmlSchemaElement>> inputParamClasses = new Dictionary<string, List<XmlSchemaElement>>();
+        Dictionary<string, List<XmlSchemaElement>> arrayClasses = new Dictionary<string, List<XmlSchemaElement>>();
+        Dictionary<string, List<XmlSchemaElement>> inputParamClasses = new Dictionary<string, List<XmlSchemaElement>>();
         Dictionary<string, List<XmlSchemaElement>> outputParamClasses = new Dictionary<string, List<XmlSchemaElement>>();
+
+        public readonly string[] basicTypes = {"string","int","boolean","dateTime","float","double","decimal" };
+
         public Form1()
         {
             InitializeComponent();
@@ -34,10 +38,11 @@ namespace UyumsoftAndroidTool
         private void button1_Click(object sender, EventArgs e)
         {
            
-            getComplexTypesAndEnums();
+            parseWsdl();
             printClasses(complexTypes,"complexType");
             printClasses(inputParamClasses,"inputParamClass");
             printClasses(outputParamClasses, "outputParamClass");
+            printClasses(arrayClasses, "arrayClass");
             printEnum();
             copyDefaultClasses(destinationPath);
         }
@@ -130,7 +135,7 @@ namespace UyumsoftAndroidTool
         }
 
     
-        public void getComplexTypesAndEnums()
+        public void parseWsdl()
         {
             UriBuilder uriBuilder = new UriBuilder(@"http://localhost/WebService1.asmx");
             uriBuilder.Query = "WSDL";
@@ -196,27 +201,21 @@ namespace UyumsoftAndroidTool
                 XmlSchemaElement element = item as XmlSchemaElement;
 
 
-                string fileName = "";
+               // string fileName = "";
                 if (complexType != null)
                 {
-                    fileName = destinationPath + complexType.Name + ".java";
-                    try
+                    //   fileName = destinationPath + complexType.Name + ".java";
+                    if (complexType.Name.StartsWith("ArrayOf"))
                     {
-                        //WriteImports(fileName);
-                        using (StreamWriter writer = new StreamWriter(fileName, true))
-                        {
-
-                            List<XmlSchemaElement> list = OutputElements(complexType.Particle);
-                            complexTypes[complexType.Name] = list;
-
-                        }
-
+                        string arraytype= complexType.Name.Split(new string[] { "ArrayOf" }, StringSplitOptions.None)[1];
+                       
+                        arrayClasses["ArrayOf"+getType(arraytype)]= OutputElements(complexType.Particle); ;
+                        //arrayClasses[complexType.Name]=OutputElements
                     }
-                    catch (Exception Ex)
+                    else
                     {
-                        Console.WriteLine(Ex.ToString());
+                        complexTypes[complexType.Name] = OutputElements(complexType.Particle); 
                     }
-
 
                 }
                 else if (simpleType != null)
@@ -273,9 +272,7 @@ namespace UyumsoftAndroidTool
                 }
             }
 
-            //printEnum();
-            // Console.Out.WriteLine();
-            // Console.In.ReadLine();
+          
         }
 
         /*
@@ -327,7 +324,7 @@ namespace UyumsoftAndroidTool
                 writer.WriteLine("      p{0}.setValue({1});", i, element.Name);
                 writer.WriteLine("      p{0}.setType({1});", i, getClassOfField(element.SchemaTypeName.Name));
                 writer.WriteLine("      p{0}.setNamespace(\"{1}\");", i, Namespace);
-                writer.WriteLine("      request.addProperty(p{0});", i);
+                writer.WriteLine("      request.addProperty(p{0});\n", i);
 
             }
 
@@ -347,9 +344,20 @@ namespace UyumsoftAndroidTool
                     {
                         writer.WriteLine("package " +packageName + ";\n");
                         printImports(writer);
-                        writer.WriteLine("public class {0} extends BaseObject {{\n", entry.Key);
-                        printFields(entry.Value, writer);
 
+                        if (classType != "arrayClass")
+                        {
+                            writer.WriteLine("public class {0} extends BaseObject {{\n", entry.Key);
+                            printFields(entry.Value, writer);
+                        }
+                        else writer.WriteLine("public class {0} extends Vector<{1}> implements KvmSerializable {{\n", entry.Key, getNonPrimitiveType(entry.Value[0].SchemaTypeName.Name));
+
+                        
+
+                        if (classType == "arrayClass") {
+                            writer.WriteLine("private static final long serialVersionUID = 1L;");
+                            printAdditionalFuncsForArrayClass(entry.Value[0],writer);
+                        }
                         if (classType == "inputParamClass")
                         {
                             writer.WriteLine("      private static final String METHOD_NAME = \"" + entry.Key + "\";");
@@ -358,7 +366,9 @@ namespace UyumsoftAndroidTool
                         }
 
                         printGetPropertyFunc(entry.Value, writer,classType);
-                        writer.WriteLine("\npublic int getPropertyCount() {{ return {0}; }}\n", entry.Value.Count);
+                        if (classType != "arrayClass") writer.WriteLine("\npublic int getPropertyCount() {{ return {0}; }}\n", entry.Value.Count);
+                        else writer.WriteLine("\npublic int getPropertyCount() { return this.size(); }\n");
+
                         printGetPropertyInfoFunc(entry.Value, writer,classType);
                         printSetPropertyFunc(entry.Value, writer,classType);
 
@@ -380,20 +390,114 @@ namespace UyumsoftAndroidTool
             }
         }
 
+       
         
         private void printLoadSoapObjectFuncForOutput(XmlSchemaElement element,StreamWriter writer)
         {
-            writer.WriteLine(@"
+            string type = element.SchemaTypeName.Name;
+            string setval = "";
+           // if (basicTypes.Contains(element.SchemaTypeName.Name)) { 
+          
+                setval = castValueToType(type, "property",varName:element.Name);
+                writer.WriteLine(@"
 public void loadSoapObject(SoapObject property){{
 		if(property == null) return;
-		{0} = new {1}();
-		{0}.loadSoapObject(property);
+		{0}
+       
 	}}"
-,element.Name,
-element.SchemaTypeName.Name
-
+, setval
+,element.Name
 );
+                /*
+            }
+            
+            else
+            {
 
+                writer.WriteLine(@"
+public void loadSoapObject(SoapObject property){{
+		if(property == null) return;
+        {0}
+		
+	}}"
+, castValueToType(type, "property",element.Name)
+   
+
+    );
+            }
+            */
+
+            }
+
+            private string castValueToType(string type,string toBeCast, string varName="item",bool createNewObject=false)
+        {
+            string typeClass = createNewObject ? getType(type) : "";
+            switch (type)
+            {
+                case "string":  return typeClass+" "+varName+"="+ toBeCast+".toString();";
+                case "int": return typeClass + " " + varName + "=Integer.parseInt(" + toBeCast + ".toString());";
+                case "double": return typeClass + " " + varName + "=new BigDecimal(" + toBeCast+".toString());";
+                case "float": return typeClass + " " + varName + "=new BigDecimal(" + toBeCast+".toString());";
+                case "decimal": return typeClass + " " + varName + "=new BigDecimal(" + toBeCast+".toString());";
+                case "dateTime": return typeClass + " " + varName + "=DateUtil.getDate(" + toBeCast + ".toString());";
+                case "boolean": return typeClass + " " + varName + "=Boolean.parseBoolean(" + toBeCast + ".toString());";
+              
+                default:
+                    if(createNewObject)  return type+" "+varName+" = new "+type+"(); "+varName+".loadSoapObject("+toBeCast+");";
+                    else return " " + varName + " = new " + type + "(); " + varName + ".loadSoapObject(" + toBeCast + ");";
+            }
+
+        }
+
+        private void printLoadSoapObjectFuncForArray(string type,StreamWriter writer)
+        {
+
+
+            writer.WriteLine(
+@"public void loadSoapObject(SoapObject property){
+		if(property == null) return;
+		int itemCount = property.getPropertyCount();
+		if(itemCount > 0){
+			for(int loop=0;loop < itemCount;loop++){
+				SoapObject pii = (SoapObject)property.getProperty(loop);");
+
+            if (basicTypes.Contains(type))
+            {
+                writer.WriteLine("				" + castValueToType(type,"pii.getProperty(0)",createNewObject:true)+";");
+            }
+            /*
+            if (type == "String")
+            {
+                writer.WriteLine(@"        
+                String item = pii.getProperty(0).toString();");
+            }
+            else if (type == "int")
+            {
+                writer.WriteLine(@"        
+                int item=Integer.parseInt(pii.getProperty(0).toString());");
+            }
+            else if (getType(type) == "BigDecimal")
+            {
+                writer.WriteLine(@"        
+                BigDecimal item=new BigDecimal(pii.getProperty(0).toString());");
+            }else if (type == "Date")
+            {
+                writer.WriteLine(@"        
+                Date item=DateUtil.getDate(pii.getProperty(0).toString());;");
+            }*/
+            else
+            {
+                writer.WriteLine(@"
+                {0} item = new {0}();
+				item.loadSoapObject(pii);", type);
+            }
+
+            writer.WriteLine(@"
+                this.add(item);
+        	}
+        }
+	}  ");
+            
         }
         private void printSetPropertyFunc(List<XmlSchemaElement> fields, StreamWriter writer,string classType)
         {
@@ -406,11 +510,15 @@ public void setProperty(int index, Object value)
     {0}=({1}) value;
 }}"
 ,fields[0].Name
-,fields[0].SchemaTypeName.Name
+,getType(fields[0].SchemaTypeName.Name)
 );
+            }else if (classType == "arrayClass")
+            {
+                writer.WriteLine("public void setProperty(int arg0, Object arg1) {{this.add(({0})arg1);}}",getType(fields[0].SchemaTypeName.Name));
             }
             else
             {
+                
                 string head = @"
 public void setProperty(int index, Object value)
 {
@@ -421,10 +529,11 @@ public void setProperty(int index, Object value)
                 for (int i = 0; i < fields.Count; i++)
                 {
                     XmlSchemaElement field = fields[i];
-
-                    //string type = getClassOfField(field.SchemaTypeName.Name);
-                    string[] values = getValueOfField(field.SchemaTypeName.Name); //values[0] = defaultvalue  //values [1] = value
-                    writer.WriteLine(@"          
+                    if (basicTypes.Contains(field.SchemaTypeName.Name))
+                    {
+                        //string type = getClassOfField(field.SchemaTypeName.Name);
+                        string[] values = getValueOfField(field.SchemaTypeName.Name); //values[0] = defaultvalue  //values [1] = value
+                        writer.WriteLine(@"          
             case {0} :
                if(value.toString().equalsIgnoreCase(""anyType{{}}""))
                     {1} = {2};
@@ -433,10 +542,43 @@ public void setProperty(int index, Object value)
                
                 break;"
 
-                    , i, field.Name, values[0], values[1]);
+                        , i, field.Name, values[0], values[1]);
 
+                    }else if (complexTypes.ContainsKey(field.SchemaTypeName.Name))
+                    {
+                        writer.WriteLine(@"
+            case {0}:
+                 if(value != null){{ 
+                      SoapObject pi = (SoapObject)value; 
+                      int itemCount = pi.getPropertyCount(); 
+                      if(itemCount > 0){{ 
+                          {1}
+                         }} 
+              }} 
+                  break; 
+                ",i,castValueToType(field.SchemaTypeName.Name,"pi",varName:field.Name));
+
+                    }
+                    else if(arrayClasses.ContainsKey(field.SchemaTypeName.Name))
+                    {
+                        writer.WriteLine(@"
+            case {0} :
+                if(value != null){{ 
+                      {2} = new {1}(); 
+                      SoapObject prp = (SoapObject)value; 
+                      int itemCount = prp.getPropertyCount(); 
+                      for(int loop=0;loop<itemCount;loop++){{ 
+                      if(prp.getProperty(loop) instanceof SoapObject){{
+                          SoapObject pi = (SoapObject)prp.getProperty(loop); 
+                          {3}
+                          {2}.add(item); 
+                       }} 
+                       }} 
+                      }}
+                      break; ",i,field.SchemaTypeName.Name,field.Name,castValueToType(arrayClasses[field.SchemaTypeName.Name][0].SchemaTypeName.Name,"pi",createNewObject:true));
+                    }
+                    writer.WriteLine();
                 }
-                writer.WriteLine();
                 //writer.WriteLine("            default : break;");
 
                 writer.WriteLine("      }\n} ");
@@ -457,6 +599,20 @@ public void setProperty(int index, Object value)
 }}"
 ,fields[0].Name
 ,getClassOfField(fields[0].SchemaTypeName.Name));
+            }else if (classType == "arrayClass")
+            {
+                writer.WriteLine(@"@SuppressWarnings(""unchecked"")
+    public void getPropertyInfo(int index, Hashtable properties, PropertyInfo info)
+    {{
+        info.name = ""{0}"";
+        info.type={1};
+        info.namespace=""{2}"";
+
+}}"
+, fields[0].Name
+, getClassOfField(fields[0].SchemaTypeName.Name)
+,Namespace);
+
             }
             else
             {
@@ -517,7 +673,7 @@ public void getPropertyInfo(int index, Hashtable properties, PropertyInfo info)
                     type = "Date.class.getClass()";
                     break;
                 default:
-                    if (complexTypes.ContainsKey(typename))
+                    if (complexTypes.ContainsKey(typename)||arrayClasses.ContainsKey(typename)||inputParamClasses.ContainsKey(typename)||outputParamClasses.ContainsKey(typename))
                     {
                         type = "new " + typename + "().getClass()";
                     } else if (enumDict.ContainsKey(typename))
@@ -568,7 +724,7 @@ public void getPropertyInfo(int index, Hashtable properties, PropertyInfo info)
                     defaultValue = "new Date(1900, 1, 1)";
                     break;
                 default:
-                    if (complexTypes.ContainsKey(typename))
+                    if (complexTypes.ContainsKey(typename) || arrayClasses.ContainsKey(typename) || inputParamClasses.ContainsKey(typename) || outputParamClasses.ContainsKey(typename))
                     {
                         type = "("+typename+")value";
                         defaultValue = "null";
@@ -594,15 +750,22 @@ public void getPropertyInfo(int index, Hashtable properties, PropertyInfo info)
             {
                 string type = childElement.SchemaTypeName.Name;
                 bool isEnum = enumDict.ContainsKey(type);
-                if (Equals(type, "string")) type = "String";
-                else if (Equals(type, "double") || Equals(type, "float") || Equals(type, "decimal")) type = "BigDecimal";
-                else if (Equals(type, "dateTime")) type = "Date";
-                else if (isEnum) type = "String";
+                type = getType(type);
 
                 if (!isEnum) writer.WriteLine("      public {0} {1} ;", type, childElement.Name);
                 else writer.WriteLine("      public {0} {1} ;  // Enum {2} ", type, childElement.Name, childElement.SchemaTypeName.Name);
 
             }
+        }
+        private string getType(string type)
+        {
+            bool isEnum = enumDict.ContainsKey(type);
+
+            if (Equals(type, "string")) type = "String";
+            else if (Equals(type, "double") || Equals(type, "float") || Equals(type, "decimal")) type = "BigDecimal";
+            else if (Equals(type, "dateTime")) type = "Date";
+            else if (isEnum) type = "String";
+            return type;
         }
 
         private void printGetPropertyFunc(List<XmlSchemaElement> fields,StreamWriter writer,string classType )
@@ -617,6 +780,9 @@ public Object getProperty(int index)
 
     }}",fields[0].Name);
 
+            }else if (classType=="arrayClass")
+            {
+                writer.WriteLine("public Object getProperty(int arg0) {return this.get(arg0);}");
             }
             else
             {
@@ -688,6 +854,8 @@ import org.ksoap2.serialization.SoapObject;
 import org.ksoap2.serialization.PropertyInfo;
 import org.ksoap2.serialization.SoapPrimitive;
 import org.ksoap2.serialization.SoapSerializationEnvelope;
+import java.util.Vector;
+import org.ksoap2.serialization.KvmSerializable;
 
                 "
                    );
@@ -729,9 +897,32 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
 
         }
 
+        private void printAdditionalFuncsForArrayClass(XmlSchemaElement element, StreamWriter writer)
+        {
+            writer.WriteLine(@" 
+protected String getItemDescriptor() {{return ""{0}""; }}
 
+protected Class getElementClass() {{ return {1}; }}
+"
+,element.SchemaTypeName.Name
+,getClassOfField(element.SchemaTypeName.Name)
+);
+
+            printLoadSoapObjectFuncForArray(element.SchemaTypeName.Name,writer);
+        }
+
+        private string getNonPrimitiveType(string typename)
+        {
+            switch (typename)
+            {
+                case "int":
+                    return "Integer";
+                default:
+                    return getType(typename);
+            }
+        }
     //-------------------------------------------------------------------------------------------------------------
-    private static List<XmlSchemaElement> OutputElements(XmlSchemaParticle particle)
+        private static List<XmlSchemaElement> OutputElements(XmlSchemaParticle particle)
         {
             List<XmlSchemaElement> list = new List<XmlSchemaElement>();
                    
@@ -741,7 +932,7 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
 
                 if (sequence != null)
                 {
-                    Console.Out.WriteLine("  Sequence");
+                  
 
                     for (int i = 0; i < sequence.Items.Count; i++)
                     {
@@ -752,8 +943,7 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
 
                         if (childElement != null)
                         {
-                            Console.Out.WriteLine("    Element/Type: {0}:{1}", childElement.Name,
-                                                  childElement.SchemaTypeName.Name);
+                          
                            list.Add(childElement);
                            // writer.WriteLine("public {0} {1} ;", childElement.SchemaTypeName.Name, childElement.Name);
                         }
@@ -762,7 +952,7 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
                 }
                 else if (choice != null)
                 {
-                    Console.Out.WriteLine("  Choice");
+                  
                     for (int i = 0; i < choice.Items.Count; i++)
                     {
                         XmlSchemaElement childElement = choice.Items[i] as XmlSchemaElement;
@@ -773,17 +963,16 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
                         if (childElement != null)
                         {
                         list.Add(childElement);
-                        Console.Out.WriteLine("    Element/Type: {0}:{1}", childElement.Name,
-                                                  childElement.SchemaTypeName.Name);
+                       
                         }
                         else OutputElements(choice.Items[i] as XmlSchemaParticle);
                     }
 
-                    Console.Out.WriteLine();
+                  
                 }
                 else if (all != null)
                 {
-                    Console.Out.WriteLine("  All");
+                   
                     for (int i = 0; i < all.Items.Count; i++)
                     {
                         XmlSchemaElement childElement = all.Items[i] as XmlSchemaElement;
@@ -794,12 +983,11 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
                         if (childElement != null)
                         {
                         list.Add(childElement);
-                        Console.Out.WriteLine("    Element/Type: {0}:{1}", childElement.Name,
-                                                  childElement.SchemaTypeName.Name);
+                        
                         }
                         else OutputElements(all.Items[i] as XmlSchemaParticle);
                     }
-                    Console.Out.WriteLine();
+                    
                 }
             return list;
             
