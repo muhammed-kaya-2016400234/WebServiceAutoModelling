@@ -328,7 +328,7 @@ namespace UyumsoftAndroidTool
                 writer.WriteLine("      p{0}.setName(\"{1}\");",i,element.Name);
                 writer.WriteLine("      p{0}.setValue({1});", i, element.Name);
                 writer.WriteLine("      p{0}.setType({1});", i, getClassOfField(element.SchemaTypeName.Name));
-                writer.WriteLine("      p{0}.setNamespace(\"{1}\");", i, Namespace);
+                writer.WriteLine("      p{0}.setNamespace(\"{1}\");", i, schematargetnamespace);
                 writer.WriteLine("      request.addProperty(p{0});\n", i);
 
             }
@@ -1129,11 +1129,12 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
 			SoapFault fault = getFault(envelope);
 			if(fault == null){{
         		
-        		SoapObject response = (SoapObject)envelope.getResponse();
-        		if(response != null){{
+        		//SoapObject response = (SoapObject)envelope.getResponse();
+				Object obj=envelope.getResponse();
+        		if(obj != null){{
         			resp = new {0}Response();
-        			resp.loadSoapObject(response);
-        		}}        		
+        			resp.loadSoapObject(obj);
+        		}}          		
 			}}
 			else{{
 				Log.i(getClass().getSimpleName(), fault.faultstring);
