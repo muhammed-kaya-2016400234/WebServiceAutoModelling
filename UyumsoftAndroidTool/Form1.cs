@@ -22,6 +22,10 @@ namespace UyumsoftAndroidTool
         public string packageName = "com.example.myproject.models";
         public string destinationPath = "C:\\Users\\muhammet.kaya\\AndroidStudioProjects\\MyProject\\app\\src\\main\\java\\com\\example\\myproject\\models\\";
         public string Namespace = "www.tempuri.org";
+        string schematargetnamespace = "";
+        public bool isDotNet = true;
+        public bool debug = true;
+        public int timeout = 100000;
         Dictionary<string, List<string>> enumDict = new Dictionary<string, List<string>>();
         Dictionary<string, List<XmlSchemaElement>> complexTypes = new Dictionary<string, List<XmlSchemaElement>>();
         Dictionary<string, List<XmlSchemaElement>> arrayClasses = new Dictionary<string, List<XmlSchemaElement>>();
@@ -44,6 +48,7 @@ namespace UyumsoftAndroidTool
             printClasses(outputParamClasses, "outputParamClass");
             printClasses(arrayClasses, "arrayClass");
             printEnum();
+            printWebServiceClass();
             copyDefaultClasses(destinationPath);
         }
         static void ServiceTest()
@@ -157,7 +162,7 @@ namespace UyumsoftAndroidTool
             
             Types types = serviceDescription.Types;
             XmlSchema xmlSchema = types.Schemas[0];
-            string schemaTargetNamespace = xmlSchema.TargetNamespace;
+            schematargetnamespace = xmlSchema.TargetNamespace;
 
             
            
@@ -207,7 +212,7 @@ namespace UyumsoftAndroidTool
                     //   fileName = destinationPath + complexType.Name + ".java";
                     if (complexType.Name.StartsWith("ArrayOf"))
                     {
-                        string arraytype= complexType.Name.Split(new string[] { "ArrayOf" }, StringSplitOptions.None)[1];
+                        string arraytype = complexType.Name.Substring("ArrayOf".Length);
                        
                         arrayClasses["ArrayOf"+getType(arraytype)]= OutputElements(complexType.Particle); ;
                         //arrayClasses[complexType.Name]=OutputElements
@@ -349,10 +354,13 @@ namespace UyumsoftAndroidTool
                         {
                             writer.WriteLine("public class {0} extends BaseObject {{\n", entry.Key);
                             printFields(entry.Value, writer);
+                            printClassConstructor(entry.Key, writer, entry.Value);
                         }
+                        
                         else writer.WriteLine("public class {0} extends Vector<{1}> implements KvmSerializable {{\n", entry.Key, getNonPrimitiveType(entry.Value[0].SchemaTypeName.Name));
 
-                        
+                      
+
 
                         if (classType == "arrayClass") {
                             writer.WriteLine("private static final long serialVersionUID = 1L;");
@@ -361,7 +369,7 @@ namespace UyumsoftAndroidTool
                         if (classType == "inputParamClass")
                         {
                             writer.WriteLine("      private static final String METHOD_NAME = \"" + entry.Key + "\";");
-                            writer.WriteLine("      private static final String NAMESPACE = \"" + Namespace + "\";\n");
+                            writer.WriteLine("      private static final String NAMESPACE = \"" + schematargetnamespace + "\";\n");
                             printInputParamClassAdditionalFuncs(entry.Value,writer);
                         }
 
@@ -429,8 +437,9 @@ public void loadSoapObject(SoapObject property){{
 
             }
 
-            private string castValueToType(string type,string toBeCast, string varName="item",bool createNewObject=false)
+        private string castValueToType(string type,string toBeCast, string varName="item",bool createNewObject=false)
         {
+            if (enumDict.ContainsKey(type)) type = "string";
             string typeClass = createNewObject ? getType(type) : "";
             switch (type)
             {
@@ -459,11 +468,11 @@ public void loadSoapObject(SoapObject property){{
 		int itemCount = property.getPropertyCount();
 		if(itemCount > 0){
 			for(int loop=0;loop < itemCount;loop++){
-				SoapObject pii = (SoapObject)property.getProperty(loop);");
+				");
 
-            if (basicTypes.Contains(type))
+            if (basicTypes.Contains(type)||enumDict.ContainsKey(type))
             {
-                writer.WriteLine("				" + castValueToType(type,"pii.getProperty(0)",createNewObject:true)+";");
+                writer.WriteLine("				" + castValueToType(type,"property.getProperty(loop)",createNewObject:true)+";");
             }
             /*
             if (type == "String")
@@ -488,6 +497,7 @@ public void loadSoapObject(SoapObject property){{
             else
             {
                 writer.WriteLine(@"
+                SoapObject pii = (SoapObject)property.getProperty(loop);
                 {0} item = new {0}();
 				item.loadSoapObject(pii);", type);
             }
@@ -544,7 +554,24 @@ public void setProperty(int index, Object value)
 
                         , i, field.Name, values[0], values[1]);
 
-                    }else if (complexTypes.ContainsKey(field.SchemaTypeName.Name))
+                    }
+                    else if (enumDict.ContainsKey(field.SchemaTypeName.Name))
+                    {
+                        //string type = getClassOfField(field.SchemaTypeName.Name);
+                        string[] values = getValueOfField(field.SchemaTypeName.Name); //values[0] = defaultvalue  //values [1] = value
+                        writer.WriteLine(@"          
+            case {0} :
+               if(value.toString().equalsIgnoreCase(""anyType{{}}""))
+                    {1} = {2};
+               else
+                    {1} = {3};
+               
+                break;"
+
+                        , i, field.Name, "\"\"", "value.toString()");
+
+                    }
+                    else if (complexTypes.ContainsKey(field.SchemaTypeName.Name))
                     {
                         writer.WriteLine(@"
             case {0}:
@@ -566,14 +593,7 @@ public void setProperty(int index, Object value)
                 if(value != null){{ 
                       {2} = new {1}(); 
                       SoapObject prp = (SoapObject)value; 
-                      int itemCount = prp.getPropertyCount(); 
-                      for(int loop=0;loop<itemCount;loop++){{ 
-                      if(prp.getProperty(loop) instanceof SoapObject){{
-                          SoapObject pi = (SoapObject)prp.getProperty(loop); 
-                          {3}
-                          {2}.add(item); 
-                       }} 
-                       }} 
+                      {2}.loadSoapObject(prp);
                       }}
                       break; ",i,field.SchemaTypeName.Name,field.Name,castValueToType(arrayClasses[field.SchemaTypeName.Name][0].SchemaTypeName.Name,"pi",createNewObject:true));
                     }
@@ -611,7 +631,7 @@ public void setProperty(int index, Object value)
 }}"
 , fields[0].Name
 , getClassOfField(fields[0].SchemaTypeName.Name)
-,Namespace);
+,schematargetnamespace);
 
             }
             else
@@ -992,5 +1012,212 @@ protected Class getElementClass() {{ return {1}; }}
             return list;
             
         }
+
+        private HashSet<string> getMappings(string className)
+        {
+            
+                HashSet<string> list = new HashSet<string>();
+            
+                list.Add(className);
+                List<XmlSchemaElement> classList = new List<XmlSchemaElement>();
+                if(complexTypes.ContainsKey(className))
+                    classList.AddRange(complexTypes[className]);
+                if (arrayClasses.ContainsKey(className))
+                    classList.AddRange(arrayClasses[className]);
+                if (inputParamClasses.ContainsKey(className))
+                    classList.AddRange(inputParamClasses[className]);
+                if (outputParamClasses.ContainsKey(className))
+                    classList.AddRange(outputParamClasses[className]);
+                foreach (XmlSchemaElement elem in classList)
+                {
+                    if (!basicTypes.Contains(elem.SchemaTypeName.Name)&&!enumDict.ContainsKey(elem.SchemaTypeName.Name))
+                    {
+                        list.UnionWith(getMappings(elem.SchemaTypeName.Name));
+                    }
+
+                }
+            
+
+
+            return list;
+                
+        }
+        
+        private void printWebServiceClass()
+        {
+            using(StreamWriter writer=new StreamWriter(destinationPath + "/WebService.java"))
+            {
+                writer.WriteLine(@"
+package {0};
+
+import java.util.Date;
+import android.util.Log;
+import java.util.Hashtable;
+import java.math.BigDecimal;
+
+import java.io.IOException;
+import org.ksoap2.SoapFault;
+import org.ksoap2.SoapEnvelope;
+import java.net.SocketTimeoutException;
+import org.ksoap2.serialization.SoapObject;
+import org.ksoap2.transport.HttpTransportSE;
+import org.ksoap2.serialization.SoapSerializationEnvelope;
+
+	public final class WebService
+	{{
+
+		private Boolean debug = {1};
+		private String requestDump = """";
+		private String responseDump = """";
+		private String faultstring = """";
+
+		public String Address;
+		public boolean IsDotNet = {2};
+		public int TimeOut = {3};
+		protected static final String NAMESPACE = ""{4}"";
+        
+        ",packageName,debug.ToString().ToLower(),isDotNet.ToString().ToLower(), timeout,schematargetnamespace);
+
+                foreach (string elem in inputParamClasses.Keys)
+                {
+
+
+                    writer.WriteLine(@"
+    public {0}Response {0}({0} params) throws Exception
+		    {{
+            SoapSerializationEnvelope envelope = new SoapSerializationEnvelope(SoapEnvelope.VER11);
+			envelope.dotNet = IsDotNet;
+			envelope.setOutputSoapObject(params.GetSoapParams());
+", elem);
+
+
+                  
+
+                    HashSet<string> mappings = new HashSet<string>();
+                    mappings.UnionWith(getMappings(elem));
+                    mappings.UnionWith(getMappings(elem+"Response"));
+                    foreach (string map in mappings)
+                    {
+                        writer.WriteLine(@"             envelope.addMapping(NAMESPACE, ""{0}"", {0}.class);",map);
+                    }
+                    writer.WriteLine(@"
+            new MarshalDecimal().register(envelope);
+			new MarshalDouble().register(envelope);
+			new MarshalDate().register(envelope);
+			new MarshalFloat().register(envelope);
+            
+            HttpTransportSE androidHttpTransport = new HttpTransportSE(Address, TimeOut);
+			androidHttpTransport.debug = debug;
+			
+			try{{
+				androidHttpTransport.call(params.GetSoapAction(), envelope);
+			}}
+			catch (Exception s) {{
+				faultstring = s.getMessage();
+				s.printStackTrace();
+				Log.e(getClass().getSimpleName() + "" /{0}"", faultstring);
+
+                return null;
+                }}
+
+            if(debug == true){{
+				requestDump = androidHttpTransport.requestDump;
+				responseDump = androidHttpTransport.responseDump;
+			}}
+	        
+			{0}Response resp = null;
+			SoapFault fault = getFault(envelope);
+			if(fault == null){{
+        		
+        		SoapObject response = (SoapObject)envelope.getResponse();
+        		if(response != null){{
+        			resp = new {0}Response();
+        			resp.loadSoapObject(response);
+        		}}        		
+			}}
+			else{{
+				Log.i(getClass().getSimpleName(), fault.faultstring);
+        		throw new Exception(fault.faultstring);
+			}}
+
+			return resp;
+
+                ", elem);
+
+            
+                    writer.WriteLine(@"
+            }");
+                }
+
+                writer.WriteLine(@"
+    public String getRequestDump(){
+		return requestDump;
+	}
+	
+	public String getResponseDump(){
+		return responseDump;
+	}
+	
+	public String getFaultString(){
+		return faultstring;
+	}
+
+	public void setDebug(Boolean isdebug){
+		debug = isdebug;
+	}		
+
+	private SoapFault getFault(SoapSerializationEnvelope envelope){
+		SoapFault fault = null;
+		faultstring = """";
+		try{
+			fault = SoapFault.class.cast(envelope.bodyIn);
+			Log.e(getClass().getSimpleName(), fault.faultstring);
+			faultstring = fault.faultstring;
+		}
+		catch ( final ClassCastException ex ){
+			ex.printStackTrace();
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+		return fault;
+	}    
+");
+
+
+
+                writer.WriteLine("}");
+            }
+        }
+
+        private void printClassConstructor(string className, StreamWriter writer, List<XmlSchemaElement> classParams)
+        {
+            
+            string parameters = "";
+            string assignments = "";
+            
+            foreach (XmlSchemaElement elem in classParams)
+                {
+                    parameters += getType(elem.SchemaTypeName.Name) + " " + elem.Name+",";
+                    assignments += "this." + elem.Name + "=" + elem.Name + ";\n";
+                }
+            if(parameters.Length>0)
+                parameters = parameters.Substring(0,parameters.Length-1);
+
+            if (classParams.Count > 0)
+            {
+                writer.WriteLine(@"
+
+public {0}(){{super();}}
+
+public {0}({1}){{
+{2}
+}}
+", className, parameters, assignments);
+
+            }
+ 
+        }
+
     }
 }
