@@ -16,9 +16,10 @@ public abstract class BaseObject implements KvmSerializable, Serializable {
 	}
 
 	public void loadSoapObject(Object obj){
+		if (obj == null) return;
+
 		if(obj instanceof SoapObject) {
 			SoapObject property=(SoapObject)obj;
-			if (property == null) return;
 			int pr = getPropertyCount();
 			PropertyInfo pro = new PropertyInfo();
 			for (int i = 0; i < pr; i++) {
@@ -36,6 +37,8 @@ public abstract class BaseObject implements KvmSerializable, Serializable {
 			setProperty(0,Float.parseFloat(obj.toString()));
 		}else if(obj instanceof Date){
 			setProperty(0,DateUtil.getDate(obj.toString()));
+		}else if(obj instanceof Boolean){
+			setProperty(0,Boolean.parseBoolean(obj.toString()));
 		}
 	}
 

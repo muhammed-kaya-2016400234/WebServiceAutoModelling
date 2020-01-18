@@ -364,7 +364,7 @@ namespace UyumsoftAndroidTool
 
                         if (classType == "arrayClass") {
                             writer.WriteLine("private static final long serialVersionUID = 1L;");
-                            printAdditionalFuncsForArrayClass(entry.Value[0],writer);
+                            printAdditionalFuncsForArrayClass(entry.Key,entry.Value[0],writer);
                         }
                         if (classType == "inputParamClass")
                         {
@@ -375,7 +375,7 @@ namespace UyumsoftAndroidTool
 
                         printGetPropertyFunc(entry.Value, writer,classType);
                         if (classType != "arrayClass") writer.WriteLine("\npublic int getPropertyCount() {{ return {0}; }}\n", entry.Value.Count);
-                        else writer.WriteLine("\npublic int getPropertyCount() { return this.size(); }\n");
+                        else writer.WriteLine("\npublic int getPropertyCount() { return Math.max(1,this.size());}\n");
 
                         printGetPropertyInfoFunc(entry.Value, writer,classType);
                         printSetPropertyFunc(entry.Value, writer,classType);
@@ -383,7 +383,12 @@ namespace UyumsoftAndroidTool
                         if (classType == "outputParamClass")
                         {
                             printLoadSoapObjectFuncForOutput(entry.Value[0],writer);
+                        }else if (classType == "complexType")
+                        {
+                            printloadSoapObjectForComplexTypes(entry.Key,writer);
                         }
+
+                        
                         writer.WriteLine("\n}");
                     }
 
@@ -408,7 +413,7 @@ namespace UyumsoftAndroidTool
           
                 setval = castValueToType(type, "property",varName:element.Name);
                 writer.WriteLine(@"
-public void loadSoapObject(SoapObject property){{
+public void loadSoapObject(Object property){{
 		if(property == null) return;
 		{0}
        
@@ -458,17 +463,18 @@ public void loadSoapObject(SoapObject property){{
 
         }
 
-        private void printLoadSoapObjectFuncForArray(string type,StreamWriter writer)
+        private void printLoadSoapObjectFuncForArray(string arrayType,string type,StreamWriter writer)
         {
 
 
             writer.WriteLine(
-@"public void loadSoapObject(SoapObject property){
-		if(property == null) return;
+@"public void loadSoapObject(Object obj){{
+		if(obj == null) return;
+        {0} property = ({0}) obj;
 		int itemCount = property.getPropertyCount();
-		if(itemCount > 0){
-			for(int loop=0;loop < itemCount;loop++){
-				");
+		if(itemCount > 0){{
+			for(int loop=0;loop < itemCount;loop++){{
+				",arrayType);
 
             if (basicTypes.Contains(type)||enumDict.ContainsKey(type))
             {
@@ -497,9 +503,9 @@ public void loadSoapObject(SoapObject property){{
             else
             {
                 writer.WriteLine(@"
-                SoapObject pii = (SoapObject)property.getProperty(loop);
-                {0} item = new {0}();
-				item.loadSoapObject(pii);", type);
+                
+                {0} item = ({0})property.getProperty(loop);
+				", type);
             }
 
             writer.WriteLine(@"
@@ -576,23 +582,23 @@ public void setProperty(int index, Object value)
                         writer.WriteLine(@"
             case {0}:
                  if(value != null){{ 
-                      SoapObject pi = (SoapObject)value; 
+                      {2} pi = ({2})value; 
                       int itemCount = pi.getPropertyCount(); 
                       if(itemCount > 0){{ 
                           {1}
                          }} 
               }} 
                   break; 
-                ",i,castValueToType(field.SchemaTypeName.Name,"pi",varName:field.Name));
+                ",i,castValueToType(field.SchemaTypeName.Name,"pi",varName:field.Name), field.SchemaTypeName.Name);
 
                     }
                     else if(arrayClasses.ContainsKey(field.SchemaTypeName.Name))
-                    {
+                    {   
                         writer.WriteLine(@"
             case {0} :
                 if(value != null){{ 
                       {2} = new {1}(); 
-                      SoapObject prp = (SoapObject)value; 
+                     {1} prp = ({1})value; 
                       {2}.loadSoapObject(prp);
                       }}
                       break; ",i,field.SchemaTypeName.Name,field.Name,castValueToType(arrayClasses[field.SchemaTypeName.Name][0].SchemaTypeName.Name,"pi",createNewObject:true));
@@ -917,7 +923,7 @@ import org.ksoap2.serialization.KvmSerializable;
 
         }
 
-        private void printAdditionalFuncsForArrayClass(XmlSchemaElement element, StreamWriter writer)
+        private void printAdditionalFuncsForArrayClass(string arrayType,XmlSchemaElement element, StreamWriter writer)
         {
             writer.WriteLine(@" 
 protected String getItemDescriptor() {{return ""{0}""; }}
@@ -928,9 +934,17 @@ protected Class getElementClass() {{ return {1}; }}
 ,getClassOfField(element.SchemaTypeName.Name)
 );
 
-            printLoadSoapObjectFuncForArray(element.SchemaTypeName.Name,writer);
-        }
+            printLoadSoapObjectFuncForArray(arrayType,element.SchemaTypeName.Name,writer);
 
+            if (enumDict.ContainsKey(element.SchemaTypeName.Name))
+            {
+                writer.WriteLine(@"
+public void add({0} item){{
+    this.add(item.toString());
+}}",element.SchemaTypeName.Name);
+            }
+        }
+        
         private string getNonPrimitiveType(string typename)
         {
             switch (typename)
@@ -1199,9 +1213,18 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
             
             foreach (XmlSchemaElement elem in classParams)
                 {
-                    parameters += getType(elem.SchemaTypeName.Name) + " " + elem.Name+",";
+                if (enumDict.ContainsKey(elem.SchemaTypeName.Name))
+                {
+                    parameters += elem.SchemaTypeName.Name + " " + elem.Name + ",";
+                    assignments += "this." + elem.Name + "=" + elem.Name + ".toString();\n";
+                }
+                else
+                {
+                    parameters += getType(elem.SchemaTypeName.Name) + " " + elem.Name + ",";
                     assignments += "this." + elem.Name + "=" + elem.Name + ";\n";
                 }
+                
+            }
             if(parameters.Length>0)
                 parameters = parameters.Substring(0,parameters.Length-1);
 
@@ -1220,5 +1243,21 @@ public {0}({1}){{
  
         }
 
+        private void printloadSoapObjectForComplexTypes(string complexType,StreamWriter writer)
+        {
+            writer.WriteLine(@"
+public void loadSoapObject(Object obj){{
+		if(obj == null) return;
+        {0} property= ({0}) obj;
+		int pr = getPropertyCount();
+		PropertyInfo pro = new PropertyInfo();
+		for(int i=0;i<pr;i++){{
+			
+			setProperty(i, property.getProperty(i));
+		}}
+	}} 
+",complexType);
+            
+        }
     }
 }
