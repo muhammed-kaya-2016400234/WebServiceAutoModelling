@@ -1114,12 +1114,12 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
 
 
                     writer.WriteLine(@"
-    public {0}Response {0}({0} params) throws Exception
+    public {1} {0}({0} params) throws Exception
 		    {{
             SoapSerializationEnvelope envelope = new SoapSerializationEnvelope(SoapEnvelope.VER11);
 			envelope.dotNet = IsDotNet;
 			envelope.setOutputSoapObject(params.GetSoapParams());
-", elem);
+", elem,getNonPrimitiveType(outputParamClasses[elem+"Response"][0].SchemaTypeName.Name));
 
 
 
@@ -1172,9 +1172,9 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
         		throw new Exception(fault.faultstring);
 			}}
 
-			return resp;
+			return resp.{1};
 
-                ", elem);
+                ", elem,elem+"Result");
 
 
                     writer.WriteLine(@"
