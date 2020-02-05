@@ -13,6 +13,7 @@ using System.Web.Services.Description;
 using System.Windows.Forms;
 using System.Xml.Schema;
 using System.Xml;
+using System.Text.RegularExpressions;
 
 namespace UyumsoftAndroidTool
 {
@@ -49,7 +50,7 @@ namespace UyumsoftAndroidTool
 
         public void execute()
         {
-
+            
             parseWsdl();
             printClasses(complexTypes, "complexType");
             printClasses(inputParamClasses, "inputParamClass");
@@ -58,6 +59,7 @@ namespace UyumsoftAndroidTool
             printEnum();
             printWebServiceClass();
             copyDefaultClasses(destinationPath);
+            
         }
         public void ServiceTest()
         {
@@ -897,6 +899,7 @@ import org.ksoap2.serialization.SoapObject;
 import org.ksoap2.serialization.PropertyInfo;
 import org.ksoap2.serialization.SoapPrimitive;
 import org.ksoap2.serialization.SoapSerializationEnvelope;
+import java.util.List;
 import java.util.Vector;
 import org.ksoap2.serialization.KvmSerializable;
 
@@ -942,6 +945,9 @@ import org.ksoap2.serialization.KvmSerializable;
 
         private void printAdditionalFuncsForArrayClass(string arrayType, XmlSchemaElement element, StreamWriter writer)
         {
+
+            printArrayClassConstructors(arrayType,element,writer);
+
             writer.WriteLine(@" 
 protected String getItemDescriptor() {{return ""{0}""; }}
 
@@ -960,6 +966,60 @@ public void add({0} item){{
     this.add(item.toString());
 }}", element.SchemaTypeName.Name);
             }
+        }
+        private void printArrayClassConstructors(string arrayType, XmlSchemaElement element, StreamWriter writer)
+        {
+
+            string toBeAdded = "";
+            string toBeAdded2 = "";
+            string typename = element.SchemaTypeName.Name;
+            string listDef = "";
+            string arrayDef = "";
+            if (arrayClasses.ContainsKey(typename))
+            {
+                toBeAdded = typename + " arr=new " + typename + "(i);this.add(arr);";
+                toBeAdded2 = typename + " arr=new " + typename + "(a[i]);this.add(arr);";
+                listDef = getListDef(element);
+                arrayDef = getArrayDef(element);
+            }
+
+            else
+            {
+                toBeAdded = "this.add(i);";
+                toBeAdded2 = "this.add(a[i]);";
+                if (enumDict.ContainsKey(typename))
+                {
+                    listDef = typename;
+                    arrayDef = typename;
+                }
+                else
+                {
+                    listDef = getNonPrimitiveType(typename);
+                    arrayDef = getNonPrimitiveType(typename);
+                }
+            }
+            //int arrayDimension = Regex.Matches(arrayType,"ArrayOf").Count;
+            //string dimensionParantheses = "";
+            //for (int i = 0; i < arrayDimension; i++) dimensionParantheses += "[]";
+
+            writer.WriteLine(@"
+public {0}(){{super();}}
+public {0}({3}[] a){{
+
+
+        for (int i=0;i<a.length;i++){{
+            {4}
+        }}
+
+}}
+public {0}(List<{1}> list){{
+    for({1} i : list){{
+        {2}
+        
+    }}
+
+}}
+", arrayType, listDef, toBeAdded,arrayDef,toBeAdded2);
         }
 
         private string getNonPrimitiveType(string typename)
@@ -1073,6 +1133,7 @@ public void add({0} item){{
             return list;
 
         }
+       
 
         private void printWebServiceClass()
         {
@@ -1085,7 +1146,7 @@ import java.util.Date;
 import android.util.Log;
 import java.util.Hashtable;
 import java.math.BigDecimal;
-
+import java.util.Collections;
 import java.io.IOException;
 import org.ksoap2.SoapFault;
 import org.ksoap2.SoapEnvelope;
@@ -1274,6 +1335,44 @@ public void loadSoapObject(Object obj){{
 		}}
 	}} 
 ", complexType);
+
+        }
+
+        private string getListDef(XmlSchemaElement elem)
+        {
+            
+           
+                string elemType = elem.SchemaTypeName.Name;
+                if (elemType.StartsWith("ArrayOf")){
+                    return "List<"+getListDef(arrayClasses[elemType][0])+">";
+                }
+                else
+                {
+                    if (!enumDict.ContainsKey(elemType))
+                        return getNonPrimitiveType(elemType);
+                    else
+                        return elemType;
+                }
+            
+            
+        }
+        private string getArrayDef(XmlSchemaElement elem)
+        {
+
+
+            string elemType = elem.SchemaTypeName.Name;
+            if (elemType.StartsWith("ArrayOf"))
+            {
+                return getArrayDef(arrayClasses[elemType][0])+"[]" ;
+            }
+            else
+            {
+                if (!enumDict.ContainsKey(elemType))
+                    return getNonPrimitiveType(elemType);
+                else
+                    return elemType;
+            }
+
 
         }
     }
