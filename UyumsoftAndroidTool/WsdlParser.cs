@@ -1151,6 +1151,7 @@ import java.io.IOException;
 import org.ksoap2.SoapFault;
 import org.ksoap2.SoapEnvelope;
 import java.net.SocketTimeoutException;
+import org.ksoap2.serialization.PropertyInfo;
 import org.ksoap2.serialization.SoapObject;
 import org.ksoap2.transport.HttpTransportSE;
 import org.ksoap2.serialization.SoapSerializationEnvelope;
@@ -1172,17 +1173,37 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
 
                 foreach (string elem in inputParamClasses.Keys)
                 {
-
-
+                    string parameters = "";
+                    foreach(XmlSchemaElement e in inputParamClasses[elem])
+                    {
+                        parameters += getType(e.SchemaTypeName.Name) + " " + e.Name+",";
+                    }
+                    parameters=parameters.Substring(0,parameters.Length-1);
                     writer.WriteLine(@"
-    public {1} {0}({0} params) throws Exception
+    public {1} {0}({4}) throws Exception
 		    {{
             SoapSerializationEnvelope envelope = new SoapSerializationEnvelope(SoapEnvelope.VER11);
 			envelope.dotNet = IsDotNet;
-			envelope.setOutputSoapObject(params.GetSoapParams());
-", elem,getNonPrimitiveType(outputParamClasses[elem+"Response"][0].SchemaTypeName.Name));
+			
+            SoapObject request = new SoapObject(""{2}"", ""{3}"");
+", elem,getNonPrimitiveType(outputParamClasses[elem+"Response"][0].SchemaTypeName.Name),schematargetnamespace,elem,parameters);
+                    List<XmlSchemaElement> list = inputParamClasses[elem];
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        XmlSchemaElement element = list[i];
+                        
+                        writer.WriteLine("            PropertyInfo p{0} = new PropertyInfo();", i);
+                        writer.WriteLine("            p{0}.setName(\"{1}\");", i, element.Name);
+                        writer.WriteLine("            p{0}.setValue({1});", i, element.Name);
+                        writer.WriteLine("            p{0}.setType({1});", i, getClassOfField(element.SchemaTypeName.Name));
+                        writer.WriteLine("            p{0}.setNamespace(\"{1}\");", i, schematargetnamespace);
+                        writer.WriteLine("            request.addProperty(p{0});\n", i);
 
-
+                    }
+                    writer.WriteLine(@"
+            
+            envelope.setOutputSoapObject(request);
+");
 
 
                     HashSet<string> mappings = new HashSet<string>();
@@ -1202,7 +1223,7 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
 			androidHttpTransport.debug = debug;
 			
 			try{{
-				androidHttpTransport.call(params.GetSoapAction(), envelope);
+				androidHttpTransport.call(""{2}"", envelope);
 			}}
 			catch (Exception s) {{
 				faultstring = s.getMessage();
@@ -1235,7 +1256,7 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
 
 			return resp.{1};
 
-                ", elem,elem+"Result");
+                ", elem,elem+"Result", schematargetnamespace+elem);
 
 
                     writer.WriteLine(@"
