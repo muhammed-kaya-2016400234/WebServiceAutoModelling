@@ -1142,6 +1142,7 @@ public {0}(List<{1}> list){{
                 writer.WriteLine(@"
 package {0};
 
+import java.util.List;
 import java.util.Date;
 import android.util.Log;
 import java.util.Hashtable;
@@ -1176,7 +1177,8 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
                     string parameters = "";
                     foreach(XmlSchemaElement e in inputParamClasses[elem])
                     {
-                        parameters += getType(e.SchemaTypeName.Name) + " " + e.Name+",";
+                        
+                        parameters += getListDef(e) + " " + e.Name+",";
                     }
                     parameters=parameters.Substring(0,parameters.Length-1);
                     writer.WriteLine(@"
@@ -1190,11 +1192,17 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
                     List<XmlSchemaElement> list = inputParamClasses[elem];
                     for (int i = 0; i < list.Count; i++)
                     {
+                        
                         XmlSchemaElement element = list[i];
                         
                         writer.WriteLine("            PropertyInfo p{0} = new PropertyInfo();", i);
                         writer.WriteLine("            p{0}.setName(\"{1}\");", i, element.Name);
-                        writer.WriteLine("            p{0}.setValue({1});", i, element.Name);
+
+                        if(!element.SchemaTypeName.Name.StartsWith("ArrayOf"))
+                            writer.WriteLine("            p{0}.setValue({1});", i, element.Name);
+                        else
+                            writer.WriteLine("            p{0}.setValue(new {1}({2}));", i,element.SchemaTypeName.Name, element.Name);
+
                         writer.WriteLine("            p{0}.setType({1});", i, getClassOfField(element.SchemaTypeName.Name));
                         writer.WriteLine("            p{0}.setNamespace(\"{1}\");", i, schematargetnamespace);
                         writer.WriteLine("            request.addProperty(p{0});\n", i);
