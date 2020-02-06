@@ -530,7 +530,7 @@ public void loadSoapObject(SoapObject property){{
         }
         private void printSetPropertyFunc(List<XmlSchemaElement> fields, StreamWriter writer, string classType)
         {
-
+            /*
             if (classType == "outputParamClass" && fields.Count > 0)
             {
                 writer.WriteLine(@"
@@ -542,9 +542,19 @@ public void setProperty(int index, Object value)
 , getType(fields[0].SchemaTypeName.Name)
 );
             }
-            else if (classType == "arrayClass")
+            else*/ if (classType == "arrayClass")
             {
-                writer.WriteLine("public void setProperty(int arg0, Object arg1) {{this.add(({0})arg1);}}", getType(fields[0].SchemaTypeName.Name));
+                string[] values = getValueOfField(fields[0].SchemaTypeName.Name); //values[0] = defaultvalue  //values [1] = value
+                writer.WriteLine(@"
+public void setProperty(int arg0, Object arg1) {{
+            Object value=arg1;
+            if(arg1.toString().equalsIgnoreCase(""anyType{{}}""))
+                    this.add({0});
+            else
+                    this.add({1});
+            
+
+}}", values[0], values[1]);
             }
             else
             {
