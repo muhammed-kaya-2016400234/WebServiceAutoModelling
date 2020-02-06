@@ -1191,6 +1191,9 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
 		public int TimeOut = {3};
 		protected static final String NAMESPACE = ""{4}"";
         
+        public WebService(String address){{
+			this.Address=address;
+		}}
         ", packageName, debug.ToString().ToLower(), isDotNet.ToString().ToLower(), timeout, schematargetnamespace);
 
                 foreach (string elem in inputParamClasses.Keys)
