@@ -948,8 +948,10 @@ import org.ksoap2.serialization.KvmSerializable;
 
             printArrayClassConstructors(arrayType,element,writer);
 
-            if(enumDict.ContainsKey(element.SchemaTypeName.Name)||isArrayofEnum(element))
-                 printToEnumListFuncForEnumArrayClasses(arrayType, element, writer);
+            if (enumDict.ContainsKey(element.SchemaTypeName.Name) || isArrayofEnum(element))
+                printToEnumListFuncForEnumArrayClasses(arrayType, element, writer);
+            else if (isArrayOfDouble(element) || arrayType == "ArrayOfDouble")
+                printToDoubleListFunc(arrayType, element, writer);
 
             writer.WriteLine(@" 
 protected String getItemDescriptor() {{return ""{0}""; }}
@@ -982,6 +984,12 @@ public void add({0} item){{
             {
                 toBeAdded = typename + " arr=new " + typename + "(i);this.add(arr);";
                 toBeAdded2 = typename + " arr=new " + typename + "(a[i]);this.add(arr);";
+                listDef = getListDef(element);
+                arrayDef = getArrayDef(element);
+            }else if (typename == "double")
+            {
+                toBeAdded = "this.add(new BigDecimal(i));";
+                toBeAdded2 = "this.add(new BigDecimal(a[i]));";
                 listDef = getListDef(element);
                 arrayDef = getArrayDef(element);
             }
@@ -1206,8 +1214,9 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
                         if (enumDict.ContainsKey(element.SchemaTypeName.Name))
                             writer.WriteLine("            p{0}.setValue({1}.toString());", i, element.Name);
                         else if (element.SchemaTypeName.Name.StartsWith("ArrayOf"))
-                            
                             writer.WriteLine("            p{0}.setValue(new {1}({2}));", i,element.SchemaTypeName.Name, element.Name);
+                        else if (element.SchemaTypeName.Name == "double")
+                            writer.WriteLine("            p{0}.setValue(new BigDecimal({1}));", i, element.Name);
                         else
                             writer.WriteLine("            p{0}.setValue({1});", i, element.Name);
 
@@ -1232,8 +1241,12 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
                     string returnVal = "";
                     if (isArrayofEnum(returnType))
                     {
-                        returnVal = "resp."+ elem + "Result"+".toEnumList()";
-                    }
+                        returnVal = "resp."+ elem + "Result.toEnumList()";
+                    }else if (returnType.SchemaTypeName.Name == "double")
+                    {
+                        returnVal = "resp." + elem + "Result.doubleValue()";
+                    }else if(isArrayOfDouble(returnType))
+                        returnVal = "resp." + elem + "Result.toDoubleList()";
                     else if (enumDict.ContainsKey(returnType.SchemaTypeName.Name))
                     {
                         returnVal = returnType.SchemaTypeName.Name+".valueOf(resp." + elem + "Result)";
@@ -1411,7 +1424,29 @@ public List<{0}> toEnumList(){{
 ",getListDef(element),getType(typename),toBeAdded);
 
         }
+        private void printToDoubleListFunc(string arrayType, XmlSchemaElement element, StreamWriter writer)
+        {
+            string typename = element.SchemaTypeName.Name;
+            string toBeAdded = "";
+            if (!element.SchemaTypeName.Name.StartsWith("ArrayOf"))
+            {
+                toBeAdded = "vec.add(s.doubleValue());";
+            }
+            else
+            {
+                toBeAdded = "vec.add(s.toDoubleList());";
+            }
+            writer.WriteLine(@"
+public List<{0}> toDoubleList(){{
+        List<{0}> vec = new Vector<>();
+        for ({1} s:this){{
+            {2}
+        }}
+        return vec;
+}}
+", getListDef(element), getType(typename), toBeAdded);
 
+        }
         private string getListDef(XmlSchemaElement elem)
         {
             
@@ -1422,30 +1457,17 @@ public List<{0}> toEnumList(){{
                 }
                 else
                 {
-                    if (!enumDict.ContainsKey(elemType))
-                        return getNonPrimitiveType(elemType);
-                    else
+                    if (enumDict.ContainsKey(elemType))
                         return elemType;
+                    else if (elemType == "double")
+                        return "Double";
+                    else
+                        return getNonPrimitiveType(elemType);
                 }
             
             
         }
-        private bool isArrayofEnum(XmlSchemaElement elem)
-        {
-
-            if (!elem.SchemaTypeName.Name.StartsWith("ArrayOf"))
-                return false;
-
-            while (elem.SchemaTypeName.Name.StartsWith("ArrayOf"))
-            {
-                elem = arrayClasses[elem.SchemaTypeName.Name][0];
-               
-            }
-            return enumDict.ContainsKey(elem.SchemaTypeName.Name);
-            
-
-
-        }
+       
         private string getArrayDef(XmlSchemaElement elem)
         {
 
@@ -1457,11 +1479,45 @@ public List<{0}> toEnumList(){{
             }
             else
             {
-                if (!enumDict.ContainsKey(elemType))
-                    return getNonPrimitiveType(elemType);
-                else
+                if (enumDict.ContainsKey(elemType))
                     return elemType;
+                else if (elemType == "double")
+                    return "Double";
+                else
+                    return getNonPrimitiveType(elemType);
             }
+
+
+        }
+        private bool isArrayofEnum(XmlSchemaElement elem)
+        {
+
+            if (!elem.SchemaTypeName.Name.StartsWith("ArrayOf"))
+                return false;
+
+            while (elem.SchemaTypeName.Name.StartsWith("ArrayOf"))
+            {
+                elem = arrayClasses[elem.SchemaTypeName.Name][0];
+
+            }
+            return enumDict.ContainsKey(elem.SchemaTypeName.Name);
+
+
+
+        }
+        private bool isArrayOfDouble(XmlSchemaElement elem)
+        {
+
+            if (!elem.SchemaTypeName.Name.StartsWith("ArrayOf"))
+                return false;
+
+            while (elem.SchemaTypeName.Name.StartsWith("ArrayOf"))
+            {
+                elem = arrayClasses[elem.SchemaTypeName.Name][0];
+
+            }
+            return elem.SchemaTypeName.Name=="double";
+
 
 
         }
