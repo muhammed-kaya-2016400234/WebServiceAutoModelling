@@ -948,6 +948,9 @@ import org.ksoap2.serialization.KvmSerializable;
 
             printArrayClassConstructors(arrayType,element,writer);
 
+            if(enumDict.ContainsKey(element.SchemaTypeName.Name)||isArrayofEnum(element))
+                 printToEnumListFuncForEnumArrayClasses(arrayType, element, writer);
+
             writer.WriteLine(@" 
 protected String getItemDescriptor() {{return ""{0}""; }}
 
@@ -1174,6 +1177,7 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
 
                 foreach (string elem in inputParamClasses.Keys)
                 {
+                    XmlSchemaElement returnType = outputParamClasses[elem + "Response"][0];
                     string parameters = "";
                     foreach(XmlSchemaElement e in inputParamClasses[elem])
                     {
@@ -1181,6 +1185,7 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
                         parameters += getListDef(e) + " " + e.Name+",";
                     }
                     parameters=parameters.Substring(0,parameters.Length-1);
+                   
                     writer.WriteLine(@"
     public {1} {0}({4}) throws Exception
 		    {{
@@ -1188,8 +1193,8 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
 			envelope.dotNet = IsDotNet;
 			
             SoapObject request = new SoapObject(""{2}"", ""{3}"");
-", elem,getNonPrimitiveType(outputParamClasses[elem+"Response"][0].SchemaTypeName.Name),schematargetnamespace,elem,parameters);
-                    List<XmlSchemaElement> list = inputParamClasses[elem];
+", elem,getListDef(returnType),schematargetnamespace,elem,parameters);
+                    List<XmlSchemaElement> list = inputParamClasses[elem];      //list of fields in input parameter class
                     for (int i = 0; i < list.Count; i++)
                     {
                         
@@ -1198,10 +1203,13 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
                         writer.WriteLine("            PropertyInfo p{0} = new PropertyInfo();", i);
                         writer.WriteLine("            p{0}.setName(\"{1}\");", i, element.Name);
 
-                        if(!element.SchemaTypeName.Name.StartsWith("ArrayOf"))
-                            writer.WriteLine("            p{0}.setValue({1});", i, element.Name);
-                        else
+                        if (enumDict.ContainsKey(element.SchemaTypeName.Name))
+                            writer.WriteLine("            p{0}.setValue({1}.toString());", i, element.Name);
+                        else if (element.SchemaTypeName.Name.StartsWith("ArrayOf"))
+                            
                             writer.WriteLine("            p{0}.setValue(new {1}({2}));", i,element.SchemaTypeName.Name, element.Name);
+                        else
+                            writer.WriteLine("            p{0}.setValue({1});", i, element.Name);
 
                         writer.WriteLine("            p{0}.setType({1});", i, getClassOfField(element.SchemaTypeName.Name));
                         writer.WriteLine("            p{0}.setNamespace(\"{1}\");", i, schematargetnamespace);
@@ -1220,6 +1228,19 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
                     foreach (string map in mappings)
                     {
                         writer.WriteLine(@"             envelope.addMapping(NAMESPACE, ""{0}"", {0}.class);", map);
+                    }
+                    string returnVal = "";
+                    if (isArrayofEnum(returnType))
+                    {
+                        returnVal = "resp."+ elem + "Result"+".toEnumList()";
+                    }
+                    else if (enumDict.ContainsKey(returnType.SchemaTypeName.Name))
+                    {
+                        returnVal = returnType.SchemaTypeName.Name+".valueOf(resp." + elem + "Result)";
+                    }
+                    else
+                    {
+                        returnVal = "resp." + elem + "Result";
                     }
                     writer.WriteLine(@"
             new MarshalDecimal().register(envelope);
@@ -1262,9 +1283,9 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
         		throw new Exception(fault.faultstring);
 			}}
 
-			return resp.{1};
+			return {1};
 
-                ", elem,elem+"Result", schematargetnamespace+elem);
+                ", elem,returnVal, schematargetnamespace+elem);
 
 
                     writer.WriteLine(@"
@@ -1367,6 +1388,30 @@ public void loadSoapObject(Object obj){{
 
         }
 
+        private void printToEnumListFuncForEnumArrayClasses(string arrayType, XmlSchemaElement element, StreamWriter writer)
+        {
+            string typename = element.SchemaTypeName.Name;
+            string toBeAdded = "";
+            if (enumDict.ContainsKey(typename))
+            {
+                toBeAdded = "vec.add(" + typename + ".valueOf(s));";
+            }
+            else
+            {
+                toBeAdded = "vec.add(s.toEnumList());";
+            }
+            writer.WriteLine(@"
+public List<{0}> toEnumList(){{
+        List<{0}> vec = new Vector<>();
+        for ({1} s:this){{
+            {2}
+        }}
+        return vec;
+}}
+",getListDef(element),getType(typename),toBeAdded);
+
+        }
+
         private string getListDef(XmlSchemaElement elem)
         {
             
@@ -1384,6 +1429,22 @@ public void loadSoapObject(Object obj){{
                 }
             
             
+        }
+        private bool isArrayofEnum(XmlSchemaElement elem)
+        {
+
+            if (!elem.SchemaTypeName.Name.StartsWith("ArrayOf"))
+                return false;
+
+            while (elem.SchemaTypeName.Name.StartsWith("ArrayOf"))
+            {
+                elem = arrayClasses[elem.SchemaTypeName.Name][0];
+               
+            }
+            return enumDict.ContainsKey(elem.SchemaTypeName.Name);
+            
+
+
         }
         private string getArrayDef(XmlSchemaElement elem)
         {
