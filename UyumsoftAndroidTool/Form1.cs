@@ -18,7 +18,8 @@ namespace UyumsoftAndroidTool
 {
     public partial class Form1 : Form
     {
-        
+        WsdlParser parser;
+        bool allSelected = true;
         public Form1()
         {
             InitializeComponent();
@@ -30,8 +31,13 @@ namespace UyumsoftAndroidTool
             string package = this.packagenameText.Text;
             string destpath = this.destpathText.Text;
             string namespacetext = this.namespaceText.Text;
-            WsdlParser parser = new WsdlParser(webservice,package,destpath,namespacetext);
-            parser.execute();
+            parser = new WsdlParser(webservice,package,destpath,namespacetext);
+            List<string> opList=parser.parse();
+            //this.checkedListBox1.Items.Add("ALL",true);
+            foreach(string s in opList)
+            {
+                this.checkedListBox1.Items.Add(s,true);
+            }
         }
 
         private void label1_Click(object sender, EventArgs e)
@@ -43,6 +49,22 @@ namespace UyumsoftAndroidTool
         private void textBox4_TextChanged(object sender, EventArgs e)
         {
 
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            List<string> wantedOperations = this.checkedListBox1.CheckedItems.Cast<string>().ToList();
+            parser.execute();
+        }
+
+        private void checkBox1_CheckedChanged(object sender, EventArgs e)
+        {
+            allSelected = !allSelected;
+            for (int i = 0; i < this.checkedListBox1.Items.Count; i++)
+            {
+                
+                this.checkedListBox1.SetItemChecked(i, allSelected);
+            }
         }
     }
 }

@@ -32,6 +32,7 @@ namespace UyumsoftAndroidTool
         Dictionary<string, List<XmlSchemaElement>> arrayClasses = new Dictionary<string, List<XmlSchemaElement>>();
         Dictionary<string, List<XmlSchemaElement>> inputParamClasses = new Dictionary<string, List<XmlSchemaElement>>();
         Dictionary<string, List<XmlSchemaElement>> outputParamClasses = new Dictionary<string, List<XmlSchemaElement>>();
+        List<string> listOfOperations = new List<string>();
 
         public readonly string[] basicTypes = { "string", "int", "boolean", "dateTime", "float", "double", "decimal" };
         
@@ -47,11 +48,15 @@ namespace UyumsoftAndroidTool
             this.timeout = timeout;
         }
         
+        public List<string> parse()
+        {
+            parseWsdl();
+            return listOfOperations;
+        }
 
         public void execute()
         {
-            
-            parseWsdl();
+           
             printClasses(complexTypes, "complexType");
             printClasses(inputParamClasses, "inputParamClass");
             printClasses(outputParamClasses, "outputParamClass");
@@ -149,7 +154,24 @@ namespace UyumsoftAndroidTool
             Console.In.ReadLine();
         }
 
+        public void filterFunctions(List<string> listOfWantedOperations)
+        {
 
+            foreach(string s in inputParamClasses.Keys)
+            {
+                if (!listOfWantedOperations.Contains(s))
+                {
+                    complexTypes.Remove(s);
+                }
+            }
+            foreach (string s in outputParamClasses.Keys)
+            {
+                if (!listOfWantedOperations.Contains(s.Substring(0,s.Length-8)))    //get substring to remove "Response" at the end 
+                {
+                    complexTypes.Remove(s);
+                }
+            }
+        }
         public void parseWsdl()
         {
             UriBuilder uriBuilder = new UriBuilder(webserviceURL);
@@ -174,12 +196,20 @@ namespace UyumsoftAndroidTool
             XmlSchema xmlSchema = types.Schemas[0];
             schematargetnamespace = xmlSchema.TargetNamespace;
 
-
-
-
-            //get input and output param classes
-            foreach (object item in serviceDescription.Messages)
+            List<string> operationList = new List<string>();
+            foreach (PortType portType in serviceDescription.PortTypes)
             {
+                foreach (Operation operation in portType.Operations)
+                {
+                    operationList.Add(operation.Name);
+                }
+            }
+            listOfOperations = operationList;
+
+
+                //get input and output param classes
+                foreach (object item in serviceDescription.Messages)
+                {   
                 System.Web.Services.Description.Message mes = item as System.Web.Services.Description.Message;
                 string mesname = mes.Name;
                 if (mesname.EndsWith("SoapIn"))
@@ -1533,6 +1563,14 @@ public List<{0}> toDoubleList(){{
 
 
 
+        }
+
+        public List<string> getComplexTypes()
+        {
+            List<string> list = new List<string>();
+
+
+            return list;
         }
     }
 }
