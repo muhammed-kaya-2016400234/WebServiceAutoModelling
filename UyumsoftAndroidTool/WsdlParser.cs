@@ -523,7 +523,7 @@ public void loadSoapObject(SoapObject property){{
 
         private string castValueToType(string type, string toBeCast, string varName = "item", bool createNewObject = false)
         {
-            if (enumDict.ContainsKey(type)) type = "string";
+            //if (enumDict.ContainsKey(type)) type = "string";
             string typeClass = createNewObject ? getType(type) : "";
             switch (type)
             {
@@ -536,8 +536,20 @@ public void loadSoapObject(SoapObject property){{
                 case "boolean": return typeClass + " " + varName + "=Boolean.parseBoolean(" + toBeCast + ".toString());";
 
                 default:
-                    if (createNewObject) return type + " " + varName + " = new " + type + "(); " + varName + ".loadSoapObject(" + toBeCast + ");";
-                    else return " " + varName + " = new " + type + "(); " + varName + ".loadSoapObject(" + toBeCast + ");";
+
+                    if (enumDict.ContainsKey(type))
+                    {
+                        if (createNewObject) return type + " " + varName + "=" +type+".valueOf("+ toBeCast + ".toString());";
+                        else return varName + "="+type + ".valueOf(" + toBeCast + ".toString());";       
+                        
+                    }
+                    else
+                    {
+                        if (createNewObject) return type + " " + varName + " = new " + type + "(); " + varName + ".loadSoapObject(" + toBeCast + ");";
+                        
+                        else return " " + varName + " = new " + type + "(); " + varName + ".loadSoapObject(" + toBeCast + ");";
+                        
+                    }
             }
 
         }
@@ -658,13 +670,13 @@ public void setProperty(int index, Object value)
                         writer.WriteLine(@"          
             case {0} :
                if(value.toString().equalsIgnoreCase(""anyType{{}}""))
-                    {1} = {2};
+                    {1} = ({2})null;
                else
-                    {1} = {3};
+                    {1} = {2}.valueOf(value.toString());
                
                 break;"
 
-                        , i, field.Name, "\"\"", "value.toString()");
+                        , i, field.Name,field.SchemaTypeName.Name);
 
                     }
                     else if (complexTypes.ContainsKey(field.SchemaTypeName.Name))
@@ -849,8 +861,8 @@ public void getPropertyInfo(int index, Hashtable properties, PropertyInfo info)
                     }
                     else if (enumDict.ContainsKey(typename))
                     {
-                        defaultValue = "\"\"";
-                        type = "value.toString()";
+                        defaultValue = "("+typename+")null";
+                        type = typename+".valueOf(value.toString())";
                     }
                     break;
 
@@ -868,10 +880,13 @@ public void getPropertyInfo(int index, Hashtable properties, PropertyInfo info)
             {
                 string type = childElement.SchemaTypeName.Name;
                 bool isEnum = enumDict.ContainsKey(type);
-                type = getType(type);
 
-                if (!isEnum) writer.WriteLine("      public {0} {1} ;", type, childElement.Name);
-                else writer.WriteLine("      public {0} {1} ;  // Enum {2} ", type, childElement.Name, childElement.SchemaTypeName.Name);
+                if(!isEnum) type = getType(type);
+
+                //if (!isEnum)
+                    writer.WriteLine("      public {0} {1} ;", type, childElement.Name);
+                //else 
+                   // writer.WriteLine("      public {0} {1} ;  // Enum {2} ", type, childElement.Name, childElement.SchemaTypeName.Name);
 
             }
         }
@@ -914,7 +929,10 @@ public Object getProperty(int index)
                 writer.WriteLine(head);
                 for (int i = 0; i < fields.Count; i++)
                 {
-                    writer.WriteLine("          case {0} : return {1};", i, fields[i].Name);
+                    if (enumDict.ContainsKey(fields[i].SchemaTypeName.Name))
+                        writer.WriteLine("          case {0} : return {1}.toString();", i, fields[i].Name);
+                    else
+                        writer.WriteLine("          case {0} : return {1};", i, fields[i].Name);
 
                 }
 
@@ -1326,10 +1344,7 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
                         returnVal = "resp." + elem + "Result.doubleValue()";
                     }else if(isArrayOfDouble(returnType))
                         returnVal = "resp." + elem + "Result.toDoubleList()";
-                    else if (enumDict.ContainsKey(returnType.SchemaTypeName.Name))
-                    {
-                        returnVal = returnType.SchemaTypeName.Name+".valueOf(resp." + elem + "Result)";
-                    }
+                    
                     else
                     {
                         returnVal = "resp." + elem + "Result";
@@ -1433,17 +1448,19 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
 
             foreach (XmlSchemaElement elem in classParams)
             {
+                
                 if (enumDict.ContainsKey(elem.SchemaTypeName.Name))
                 {
-                    parameters += elem.SchemaTypeName.Name + " " + elem.Name + ",";
-                    assignments += "this." + elem.Name + "=" + elem.Name + ".toString();\n";
+                     parameters += elem.SchemaTypeName.Name + " " + elem.Name + ",";
+                    //assignments += "this." + elem.Name + "=" + elem.Name + ".toString();\n";
                 }
                 else
                 {
+                
                     parameters += getType(elem.SchemaTypeName.Name) + " " + elem.Name + ",";
-                    assignments += "this." + elem.Name + "=" + elem.Name + ";\n";
+                    
                 }
-
+                assignments += "this." + elem.Name + "=" + elem.Name + ";\n";
             }
             if (parameters.Length > 0)
                 parameters = parameters.Substring(0, parameters.Length - 1);
