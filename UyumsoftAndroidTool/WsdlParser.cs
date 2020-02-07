@@ -1289,7 +1289,8 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
                         
                         parameters += getListDef(e) + " " + e.Name+",";
                     }
-                    parameters=parameters.Substring(0,parameters.Length-1);
+                    if(parameters!="")
+                        parameters=parameters.Substring(0,parameters.Length-1);     //delete last ,
                    
                     writer.WriteLine(@"
     public {1} {0}({4}) throws Exception
