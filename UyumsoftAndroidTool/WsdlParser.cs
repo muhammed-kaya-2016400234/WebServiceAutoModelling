@@ -50,13 +50,19 @@ namespace UyumsoftAndroidTool
         
         public List<string> parse()
         {
+            enumDict.Clear();
+            complexTypes.Clear();
+            arrayClasses.Clear();
+            inputParamClasses.Clear();
+            outputParamClasses.Clear();
+            listOfOperations.Clear();
             parseWsdl();
             return listOfOperations;
         }
 
-        public void execute()
+        public void execute(List<string> listOfWantedOperations)
         {
-           
+            filterFunctions(listOfWantedOperations);
             printClasses(complexTypes, "complexType");
             printClasses(inputParamClasses, "inputParamClass");
             printClasses(outputParamClasses, "outputParamClass");
@@ -154,21 +160,51 @@ namespace UyumsoftAndroidTool
             Console.In.ReadLine();
         }
 
+       
+
         public void filterFunctions(List<string> listOfWantedOperations)
         {
-
-            foreach(string s in inputParamClasses.Keys)
+            
+            for(int i=inputParamClasses.Count-1;i>=0;i--)
             {
-                if (!listOfWantedOperations.Contains(s))
+                string ss = inputParamClasses.ElementAt(i).Key;
+                if (!listOfWantedOperations.Contains(ss))
                 {
-                    complexTypes.Remove(s);
+                    inputParamClasses.Remove(ss);
                 }
             }
-            foreach (string s in outputParamClasses.Keys)
+            for (int i = outputParamClasses.Count - 1; i >= 0; i--)
             {
-                if (!listOfWantedOperations.Contains(s.Substring(0,s.Length-8)))    //get substring to remove "Response" at the end 
+                string ss = outputParamClasses.ElementAt(i).Key;
+                if (!listOfWantedOperations.Contains(ss.Substring(0,ss.Length-8)))    //get substring to remove "Response" at the end 
                 {
-                    complexTypes.Remove(s);
+                    outputParamClasses.Remove(ss);
+                }
+            }
+            HashSet<string> neededTypes= getAllNeededTypes(listOfWantedOperations);
+
+            for (int i = complexTypes.Count - 1; i >= 0; i--)
+            {
+                string ss = complexTypes.ElementAt(i).Key;
+                if (!neededTypes.Contains(ss))
+                {
+                    complexTypes.Remove(ss);
+                }
+            }
+            for (int i = enumDict.Count - 1; i >= 0; i--)
+            {
+                string ss = enumDict.ElementAt(i).Key;
+                if (!neededTypes.Contains(ss))
+                {
+                    enumDict.Remove(ss);
+                }
+            }
+            for (int i = arrayClasses.Count - 1; i >= 0; i--)
+            {
+                string ss = arrayClasses.ElementAt(i).Key;
+                if (!neededTypes.Contains(ss))
+                {
+                    arrayClasses.Remove(ss);
                 }
             }
         }
@@ -1544,9 +1580,19 @@ public List<{0}> toDoubleList(){{
 
             }
             return enumDict.ContainsKey(elem.SchemaTypeName.Name);
+            
+        }
+        private string getArrayItemType(XmlSchemaElement elem)
+        {
+            if (!elem.SchemaTypeName.Name.StartsWith("ArrayOf"))
+                return elem.SchemaTypeName.Name;
 
+            while (elem.SchemaTypeName.Name.StartsWith("ArrayOf"))
+            {
+                elem = arrayClasses[elem.SchemaTypeName.Name][0];
 
-
+            }
+            return elem.SchemaTypeName.Name;
         }
         private bool isArrayOfDouble(XmlSchemaElement elem)
         {
@@ -1565,12 +1611,71 @@ public List<{0}> toDoubleList(){{
 
         }
 
-        public List<string> getComplexTypes()
+        //return complex types needed for another complex type
+        public HashSet<string> getComplexTypes(XmlSchemaElement element)
         {
-            List<string> list = new List<string>();
+            string typename = element.SchemaTypeName.Name;
+            
+            HashSet<string> list = new HashSet<string>();
+            
 
+            if ( complexTypes.ContainsKey(typename))
+            {
+                list.Add(typename);
+                foreach (XmlSchemaElement elem in complexTypes[typename])
+                {
+                    HashSet<string> hs = getComplexTypes(elem);
+                    list.UnionWith(hs);
+                }
+            }
+            else if (arrayClasses.ContainsKey(typename))
+            {
+                list.Add(typename);
+                foreach (XmlSchemaElement elem in arrayClasses[typename])
+                {
+                    HashSet<string> hs = getComplexTypes(elem);
+                    list.UnionWith(hs);
+                }
+            }
+            else if (enumDict.ContainsKey(typename))
+            {
+
+                list.Add(typename);
+            }
+            else
+            {
+                
+                return list;
+            }
 
             return list;
         }
+
+        private HashSet<string> getAllNeededTypes(List<string> listOfWantedOperations)
+        {
+            HashSet<string> list = new HashSet<string>();
+            foreach(string s in listOfWantedOperations)
+            {
+                if (inputParamClasses.ContainsKey(s))
+                {
+                    foreach(XmlSchemaElement elem in inputParamClasses[s])
+                    {
+                        HashSet<string> addToList = getComplexTypes(elem);
+                        list.UnionWith(addToList);
+                    }
+                }
+                if (outputParamClasses.ContainsKey(s+"Response"))
+                {
+                    foreach (XmlSchemaElement elem in outputParamClasses[s+"Response"])
+                    {
+                        HashSet<string> addToList = getComplexTypes(elem);
+                        list.UnionWith(addToList);
+                    }
+                }
+            }
+
+            return list;
+        }
+        
     }
 }

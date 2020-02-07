@@ -27,6 +27,8 @@ namespace UyumsoftAndroidTool
 
         private void button1_Click(object sender, EventArgs e)
         {
+            this.checkBox1.Checked = true;
+            this.checkedListBox1.Items.Clear();
             string webservice = this.webServiceText.Text;
             string package = this.packagenameText.Text;
             string destpath = this.destpathText.Text;
@@ -54,7 +56,7 @@ namespace UyumsoftAndroidTool
         private void button2_Click(object sender, EventArgs e)
         {
             List<string> wantedOperations = this.checkedListBox1.CheckedItems.Cast<string>().ToList();
-            parser.execute();
+            parser.execute(wantedOperations);
         }
 
         private void checkBox1_CheckedChanged(object sender, EventArgs e)
