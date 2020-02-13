@@ -1,5 +1,4 @@
 
-
 import java.sql.Date;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -11,14 +10,21 @@ public class DateUtil {
 	
 	public static String FORMAT_DATE_ISO = "yyyy-MM-dd'T'HH:mm:ss"; // "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
 	private static SimpleDateFormat dateFormatter = new SimpleDateFormat(FORMAT_DATE_ISO);
-	
+	private static SimpleDateFormat parseFormat =
+			new SimpleDateFormat("EEE MMM dd HH:mm:ss z yyyy");
 	public static java.util.Date getDate(String str){
 		try{
 			if(str != null && str.length() > 0)
 				return dateFormatter.parse(str);
 		}
-		catch (Exception e) {	
-			e.printStackTrace();
+		catch (Exception e) {
+			try{
+				if(str != null && str.length() > 0)
+					return parseFormat.parse(str);
+			}catch (Exception es){
+				es.printStackTrace();
+			}
+
 		}
 		return new Date(1900, 1, 1);
 	}

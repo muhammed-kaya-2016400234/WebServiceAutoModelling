@@ -453,7 +453,7 @@ namespace UyumsoftAndroidTool
 
                         printGetPropertyFunc(entry.Value, writer, classType);
                         if (classType != "arrayClass") writer.WriteLine("\npublic int getPropertyCount() {{ return {0}; }}\n", entry.Value.Count);
-                        else writer.WriteLine("\npublic int getPropertyCount() { return Math.max(1,this.size());}\n");
+                        
 
                         printGetPropertyInfoFunc(entry.Value, writer, classType);
                         printSetPropertyFunc(entry.Value, writer, classType);
@@ -640,6 +640,7 @@ public void setProperty(int arg0, Object arg1) {{
                 string head = @"
 public void setProperty(int index, Object value)
 {
+   try{ 
     switch (index)
       {";
 
@@ -709,7 +710,13 @@ public void setProperty(int index, Object value)
                 }
                 //writer.WriteLine("            default : break;");
 
-                writer.WriteLine("      }\n} ");
+                writer.WriteLine(@"  
+      }
+}catch(Exception e){
+    e.printStackTrace();
+}
+}
+");
             }
         }
 
@@ -851,7 +858,8 @@ public void getPropertyInfo(int index, Hashtable properties, PropertyInfo info)
                     break;
                 case "dateTime":
                     type = "DateUtil.getDate(value.toString())";
-                    defaultValue = "new Date(1900, 1, 1)";
+                    defaultValue = @"
+                       dateFuncResult = new SimpleDateFormat(""dd / MM / yyyy"").parse(""01 / 01 / 1900"")";
                     break;
                 default:
                     if (complexTypes.ContainsKey(typename) || arrayClasses.ContainsKey(typename) || inputParamClasses.ContainsKey(typename) || outputParamClasses.ContainsKey(typename))
@@ -985,6 +993,7 @@ public Object getProperty(int index)
             writer.WriteLine(
 
            @"
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import android.util.Base64;
 import java.util.Hashtable;
@@ -1051,6 +1060,24 @@ import org.ksoap2.serialization.KvmSerializable;
 protected String getItemDescriptor() {{return ""{0}""; }}
 
 protected Class getElementClass() {{ return {1}; }}
+
+public int getPropertyCount() {{
+    StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
+
+    int i=0;
+    for(;i<stackTraceElements.length;i++){{
+        if(stackTraceElements[i].getMethodName().equals(""getPropertyCount"")){{
+            break;
+        }}
+    }}
+    //String s=stackTraceElements[i+1].getMethodName();
+    if(i<stackTraceElements.length-1&&stackTraceElements[i + 1].getMethodName().equals(""readSerializable"")){{
+        return 1;
+    }}
+
+    return this.size();
+
+}}
 "
 , element.SchemaTypeName.Name
 , getClassOfField(element.SchemaTypeName.Name)
