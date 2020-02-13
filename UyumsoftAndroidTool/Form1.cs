@@ -28,17 +28,26 @@ namespace UyumsoftAndroidTool
         private void button1_Click(object sender, EventArgs e)
         {
             this.checkBox1.Checked = true;
-            this.checkedListBox1.Items.Clear();
+            this.dataGridView1.Rows.Clear();
+            //this.checkedListBox1.Items.Clear();
             string webservice = this.webServiceText.Text;
             string package = this.packagenameText.Text;
             string destpath = this.destpathText.Text;
             string namespacetext = this.namespaceText.Text;
             parser = new WsdlParser(webservice,package,destpath,namespacetext);
-            List<string> opList=parser.parse();
+            Dictionary<string, List<XmlSchemaElement>> opList =parser.parse().Item1;
+            Dictionary<string, List<XmlSchemaElement>> outputList =parser.parse().Item2;
             //this.checkedListBox1.Items.Add("ALL",true);
-            foreach(string s in opList)
+            foreach(string s in opList.Keys)
             {
-                this.checkedListBox1.Items.Add(s,true);
+                string parameters = " ";
+                foreach(XmlSchemaElement elem in opList[s])
+                {
+                    parameters += parser.getListDef(elem)+"  "+elem.Name + ",";
+                }
+                parameters=parameters.Substring(0, parameters.Length - 1);
+                //this.checkedListBox1.Items.Add(s+"("+parameters+")           return:"+parser.getListDef(outputList[s+"Response"][0]),true);
+                this.dataGridView1.Rows.Add(true,s,parameters, parser.getListDef(outputList[s + "Response"][0]));
             }
         }
 
@@ -55,18 +64,34 @@ namespace UyumsoftAndroidTool
 
         private void button2_Click(object sender, EventArgs e)
         {
-            List<string> wantedOperations = this.checkedListBox1.CheckedItems.Cast<string>().ToList();
+            List<string> wantedOperations = new List<string>();
+            foreach (DataGridViewRow r in this.dataGridView1.Rows)
+            {
+                if(Convert.ToBoolean(r.Cells["Add"].Value)==true)
+                {
+                    string op = r.Cells["Method"].Value.ToString();
+                    wantedOperations.Add(r.Cells["Method"].Value.ToString());
+                } 
+            }
+          //  List<string> wantedOperations = this.checkedListBox1.CheckedItems.Cast<string>().ToList();
             parser.execute(wantedOperations);
         }
 
         private void checkBox1_CheckedChanged(object sender, EventArgs e)
         {
             allSelected = !allSelected;
+            foreach(DataGridViewRow r in this.dataGridView1.Rows)
+            {
+                r.Cells["Add"].Value = allSelected;
+            }
+
+            /*
             for (int i = 0; i < this.checkedListBox1.Items.Count; i++)
             {
                 
                 this.checkedListBox1.SetItemChecked(i, allSelected);
             }
+            */
         }
     }
 }

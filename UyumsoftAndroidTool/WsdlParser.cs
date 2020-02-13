@@ -48,7 +48,7 @@ namespace UyumsoftAndroidTool
             this.timeout = timeout;
         }
         
-        public List<string> parse()
+        public Tuple<Dictionary<string, List<XmlSchemaElement>>, Dictionary<string, List<XmlSchemaElement>>> parse()
         {
             enumDict.Clear();
             complexTypes.Clear();
@@ -57,7 +57,7 @@ namespace UyumsoftAndroidTool
             outputParamClasses.Clear();
             listOfOperations.Clear();
             parseWsdl();
-            return listOfOperations;
+            return new Tuple<Dictionary<string, List<XmlSchemaElement>>, Dictionary<string, List<XmlSchemaElement>>> (inputParamClasses,outputParamClasses);
         }
 
         public void execute(List<string> listOfWantedOperations)
@@ -1388,9 +1388,9 @@ import org.ksoap2.serialization.SoapSerializationEnvelope;
 			try{{
 				androidHttpTransport.call(""{2}"", envelope);
 			}}
-			catch (Exception s) {{
-				faultstring = s.getMessage();
-				s.printStackTrace();
+			catch (Exception exception) {{
+				faultstring = exception.getMessage();
+				exception.printStackTrace();
 				Log.e(getClass().getSimpleName() + "" /{0}"", faultstring);
 
                 return null;
@@ -1570,7 +1570,7 @@ public List<{0}> toDoubleList(){{
 ", getListDef(element), getType(typename), toBeAdded);
 
         }
-        private string getListDef(XmlSchemaElement elem)
+        public string getListDef(XmlSchemaElement elem)
         {
             
            
@@ -1591,7 +1591,7 @@ public List<{0}> toDoubleList(){{
             
         }
        
-        private string getArrayDef(XmlSchemaElement elem)
+        public string getArrayDef(XmlSchemaElement elem)
         {
 
 

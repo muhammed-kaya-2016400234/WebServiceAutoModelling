@@ -37,9 +37,14 @@
             this.destpathText = new System.Windows.Forms.TextBox();
             this.label4 = new System.Windows.Forms.Label();
             this.packagenameText = new System.Windows.Forms.TextBox();
-            this.checkedListBox1 = new System.Windows.Forms.CheckedListBox();
             this.button2 = new System.Windows.Forms.Button();
             this.checkBox1 = new System.Windows.Forms.CheckBox();
+            this.dataGridView1 = new System.Windows.Forms.DataGridView();
+            this.Add = new System.Windows.Forms.DataGridViewCheckBoxColumn();
+            this.Method = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Parameters = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.ReturnType = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             this.SuspendLayout();
             // 
             // button1
@@ -123,14 +128,6 @@
             this.packagenameText.Text = "com.example.myproject.models";
             this.packagenameText.TextChanged += new System.EventHandler(this.textBox4_TextChanged);
             // 
-            // checkedListBox1
-            // 
-            this.checkedListBox1.FormattingEnabled = true;
-            this.checkedListBox1.Location = new System.Drawing.Point(38, 231);
-            this.checkedListBox1.Name = "checkedListBox1";
-            this.checkedListBox1.Size = new System.Drawing.Size(438, 199);
-            this.checkedListBox1.TabIndex = 9;
-            // 
             // button2
             // 
             this.button2.Location = new System.Drawing.Point(624, 77);
@@ -154,14 +151,58 @@
             this.checkBox1.UseVisualStyleBackColor = true;
             this.checkBox1.CheckedChanged += new System.EventHandler(this.checkBox1_CheckedChanged);
             // 
+            // dataGridView1
+            // 
+            this.dataGridView1.AllowUserToAddRows = false;
+            this.dataGridView1.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.dataGridView1.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+            this.Add,
+            this.Method,
+            this.Parameters,
+            this.ReturnType});
+            this.dataGridView1.Location = new System.Drawing.Point(38, 240);
+            this.dataGridView1.Name = "dataGridView1";
+            this.dataGridView1.RowHeadersVisible = false;
+            this.dataGridView1.Size = new System.Drawing.Size(737, 221);
+            this.dataGridView1.TabIndex = 12;
+            // 
+            // Add
+            // 
+            this.Add.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.ColumnHeader;
+            this.Add.HeaderText = "Add";
+            this.Add.Name = "Add";
+            this.Add.Resizable = System.Windows.Forms.DataGridViewTriState.True;
+            this.Add.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.Automatic;
+            this.Add.Width = 51;
+            // 
+            // Method
+            // 
+            this.Method.HeaderText = "Method";
+            this.Method.Name = "Method";
+            this.Method.ReadOnly = true;
+            this.Method.Width = 150;
+            // 
+            // Parameters
+            // 
+            this.Parameters.HeaderText = "Parameters";
+            this.Parameters.Name = "Parameters";
+            this.Parameters.ReadOnly = true;
+            this.Parameters.Width = 430;
+            // 
+            // ReturnType
+            // 
+            this.ReturnType.HeaderText = "ReturnType";
+            this.ReturnType.Name = "ReturnType";
+            this.ReturnType.ReadOnly = true;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 450);
+            this.ClientSize = new System.Drawing.Size(800, 478);
+            this.Controls.Add(this.dataGridView1);
             this.Controls.Add(this.checkBox1);
             this.Controls.Add(this.button2);
-            this.Controls.Add(this.checkedListBox1);
             this.Controls.Add(this.label4);
             this.Controls.Add(this.packagenameText);
             this.Controls.Add(this.label3);
@@ -172,7 +213,8 @@
             this.Controls.Add(this.webServiceText);
             this.Controls.Add(this.button1);
             this.Name = "Form1";
-            this.Text = "Form1";
+            this.Text = "Uyumsoft Android Tool";
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -189,9 +231,13 @@
         private System.Windows.Forms.TextBox destpathText;
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.TextBox packagenameText;
-        private System.Windows.Forms.CheckedListBox checkedListBox1;
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.CheckBox checkBox1;
+        private System.Windows.Forms.DataGridView dataGridView1;
+        private System.Windows.Forms.DataGridViewCheckBoxColumn Add;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Method;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Parameters;
+        private System.Windows.Forms.DataGridViewTextBoxColumn ReturnType;
     }
 }
 
