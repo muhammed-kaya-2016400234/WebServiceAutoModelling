@@ -858,8 +858,7 @@ public void getPropertyInfo(int index, Hashtable properties, PropertyInfo info)
                     break;
                 case "dateTime":
                     type = "DateUtil.getDate(value.toString())";
-                    defaultValue = @"
-                       dateFuncResult = new SimpleDateFormat(""dd / MM / yyyy"").parse(""01 / 01 / 1900"")";
+                    defaultValue = @"new SimpleDateFormat(""dd / MM / yyyy"").parse(""01 / 01 / 1900"")";
                     break;
                 default:
                     if (complexTypes.ContainsKey(typename) || arrayClasses.ContainsKey(typename) || inputParamClasses.ContainsKey(typename) || outputParamClasses.ContainsKey(typename))
