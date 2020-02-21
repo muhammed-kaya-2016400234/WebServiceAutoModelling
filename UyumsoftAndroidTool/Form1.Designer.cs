@@ -107,8 +107,8 @@
             this.destpathText.Name = "destpathText";
             this.destpathText.Size = new System.Drawing.Size(508, 20);
             this.destpathText.TabIndex = 5;
-            this.destpathText.Text = "C:\\\\Users\\\\muhammet.kaya\\\\AndroidStudioProjects\\\\MyProject\\\\app\\\\src\\\\main\\\\java\\" +
-    "\\com\\\\example\\\\myproject\\\\models\\\\";
+            this.destpathText.Text = "C:\\Users\\muhammet.kaya\\AndroidStudioProjects\\MyApplication\\app\\src\\main\\java\\com\\" +
+    "example\\myapplication\\models";
             // 
             // label4
             // 
@@ -125,7 +125,7 @@
             this.packagenameText.Name = "packagenameText";
             this.packagenameText.Size = new System.Drawing.Size(508, 20);
             this.packagenameText.TabIndex = 7;
-            this.packagenameText.Text = "com.example.myproject.models";
+            this.packagenameText.Text = "com.example.myapplication.models";
             this.packagenameText.TextChanged += new System.EventHandler(this.textBox4_TextChanged);
             // 
             // button2

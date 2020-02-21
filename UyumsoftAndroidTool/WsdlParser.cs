@@ -389,7 +389,7 @@ namespace UyumsoftAndroidTool
                 }
         }
         */
-        private void printInputParamClassAdditionalFuncs(List<XmlSchemaElement> list, StreamWriter writer)
+        private void printInputParamClassAdditionalFuncs(string elem,List<XmlSchemaElement> list, StreamWriter writer)
         {
             writer.WriteLine(
     @"public SoapObject GetSoapParams()
@@ -414,7 +414,20 @@ namespace UyumsoftAndroidTool
             writer.WriteLine("      return request;");
             writer.WriteLine("}\n");
             writer.WriteLine("public String GetSoapAction() { return NAMESPACE + METHOD_NAME;}\n");
+
+            HashSet<string> mappings = new HashSet<string>();
+            mappings.UnionWith(getMappings(elem));
+            mappings.UnionWith(getMappings(elem + "Response"));
+            writer.WriteLine("public static void addMappings(SoapSerializationEnvelope envelope){");
+            foreach (string map in mappings)
+            {
+                writer.WriteLine(@"             envelope.addMapping(NAMESPACE, ""{0}"", {0}.class);", map);
+            }
+            writer.WriteLine("}");
+       
         }
+
+        
         private void printClasses(Dictionary<string, List<XmlSchemaElement>> dict, string classType)
         {
             foreach (KeyValuePair<string, List<XmlSchemaElement>> entry in dict)
@@ -448,7 +461,7 @@ namespace UyumsoftAndroidTool
                         {
                             writer.WriteLine("      private static final String METHOD_NAME = \"" + entry.Key + "\";");
                             writer.WriteLine("      private static final String NAMESPACE = \"" + schematargetnamespace + "\";\n");
-                            printInputParamClassAdditionalFuncs(entry.Value, writer);
+                            printInputParamClassAdditionalFuncs(entry.Key,entry.Value, writer);
                         }
 
                         printGetPropertyFunc(entry.Value, writer, classType);
@@ -626,8 +639,8 @@ public void setProperty(int index, Object value)
                 writer.WriteLine(@"
 public void setProperty(int arg0, Object arg1) {{
             Object value=arg1;
-            if(arg1.toString().equalsIgnoreCase(""anyType{{}}""))
-                    this.add({0});
+            if(arg1==null||arg1.toString().equalsIgnoreCase(""anyType{{}}""))
+                    return;
             else
                     this.add({1});
             
@@ -959,7 +972,7 @@ public Object getProperty(int index)
 
             foreach (KeyValuePair<string, List<string>> entry in enumDict)
             {
-                string fileName = "C:\\Users\\muhammet.kaya\\AndroidStudioProjects\\MyProject\\app\\src\\main\\java\\com\\example\\myproject\\models\\" + entry.Key + ".java";
+                string fileName = destinationPath+"/" + entry.Key + ".java";
                 try
                 {
 
@@ -1044,7 +1057,7 @@ import org.ksoap2.serialization.KvmSerializable;
             }
 
         }
-
+        
         private void printAdditionalFuncsForArrayClass(string arrayType, XmlSchemaElement element, StreamWriter writer)
         {
 
